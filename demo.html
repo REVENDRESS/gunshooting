@@ -471,6 +471,14 @@
  grid-column:1;grid-row:2;min-width:0;min-height:0;
  margin:0;padding:12px 0;overflow:hidden;
 }
+
+#iv-equipped #iv-loadout {container-type:size;}
+#iv-equipped .iv-cores-grid {
+ --cell:min(calc((100cqw - (var(--cols) - 1)*8px)/var(--cols)),calc((100cqh - 62px - (var(--rows) - 1)*8px)/var(--rows)));
+}
+#iv-equipped .iv-core-icon {font-size:clamp(28px,4vh,44px)!important;}
+#iv-equipped .iv-core-name {font-size:12px;}
+#iv-equipped .iv-slot-mult {font-size:13px;}
 </style>
 </head>
 <body>
@@ -491,7 +499,7 @@
    <div class="iv-lib-body"><div class="iv-grid" id="iv-cgrid"></div><div class="iv-grid" id="iv-fgrid"></div></div>
   </section>
   <section class="iv-panel iv-details"><div class="iv-hd">選択中のパーツ</div><div id="iv-det-body"></div></section>
-  <footer class="iv-controls">十字キー / 左スティック：移動　　L2 / PgUp：装備中　 R2 / PgDn：所持品　 L1 / R1：フレーム／コア　　× / Enter：決定　　○ / Esc：戻る</footer>
+  <footer class="iv-controls">十字キー / 左スティック：移動　　L2 / PgUp：装備中　 R2 / PgDn：所持品　 L1 / R1：フレーム／コア　　× / Enter：決定　　○ / Esc：戻る　 □ / S：整理</footer>
  </div>
 </div>
 
@@ -589,6 +597,7 @@ window.addEventListener('keydown', e => {
 
   if(inventoryOpen && e.key==='PageUp')inventoryArea('slots');
   if(inventoryOpen && e.key==='PageDown')inventoryArea('library');
+  if(inventoryOpen && e.key.toLowerCase()==='s') { sortInventory(); e.preventDefault(); }
   // Inventory navigation
   if (inventoryOpen) {
     const fc = equippedFrame.cols, fr = equippedFrame.rows;
@@ -825,6 +834,21 @@ const INV_ANIM_DUR = 0.20;
 let invDirty = false;
 let invLibraryTab = 'frames';
 let selectedCore = null;
+function sortInventory() {
+ if(selectedCore || invSection==='slots') return;
+ const rarityRank = item => RARITIES.findIndex(r=>r.id===item.rarity?.id);
+ if(invSection==='cores') {
+  const selected=coreInventory[invLeftCursor];
+  const order=['bullet','speed','slash','orbit','orbitspeed','shield'];
+  coreInventory.sort((a,b)=>(order.indexOf(a.type)-order.indexOf(b.type)) || (rarityRank(b)-rarityRank(a)));
+  invLeftCursor=Math.max(0,coreInventory.indexOf(selected));
+ } else {
+  const selected=frameInventory[invFrameCursor];
+  frameInventory.sort((a,b)=>(a.cols*a.rows-b.cols*b.rows) || (a.cols-b.cols) || (a.rows-b.rows) || (rarityRank(b)-rarityRank(a)));
+  invFrameCursor=Math.max(0,frameInventory.indexOf(selected));
+ }
+ invDirty=true;
+}
 function inventoryArea(area) {
  selectedCore=null; pendingSlot=-1; pendingFrameSlot=false;
  invSection=area==='slots'?'slots':invLibraryTab;
@@ -1622,7 +1646,7 @@ function renderInvDOM() {
     <div class="iv-fs-rar" style="color:${rc}">${hasRar?(ef.rarity?.label ?? 'STARTER'):'STARTER'}</div>
   </div>`;
 
-  const cGrid = `<div class="iv-cores-grid" style="--cell:min(5.5vh,56px);grid-template-columns:repeat(${fc},var(--cell));grid-template-rows:repeat(${fr},var(--cell))">
+  const cGrid = `<div class="iv-cores-grid" style="--cols:${fc};--rows:${fr};grid-template-columns:repeat(${fc},var(--cell));grid-template-rows:repeat(${fr},var(--cell))">
     ${Array.from({length:fc*fr},(_,si)=>{
       const core=equippedCores[si];
       const sel=(invSection==='slots'||selectedCore)&&invRightCursor===si;
@@ -1904,6 +1928,7 @@ function updateInput(dt) {
     player.guarding = !inventoryOpen && !invClosing && anyVal(6) > 0.5;
 
     const sq = anyBtn(2);
+    if(sq && !prev['_sq'] && inventoryOpen && !invClosing) sortInventory();
     prev['_sq'] = sq;
 
     const tri = anyBtn(3);
