@@ -427,11 +427,11 @@
   </section>
   <section class="iv-panel iv-library" id="iv-library">
    <div class="iv-hd">所持品</div>
-   <div class="iv-tabs"><button id="iv-chd" data-a="tab-cores">コア</button><button id="iv-fhd" data-a="tab-frames">フレーム</button></div>
+   <div class="iv-tabs"><button id="iv-fhd" data-a="tab-frames">フレーム</button><button id="iv-chd" data-a="tab-cores">コア</button></div>
    <div class="iv-lib-body"><div class="iv-grid" id="iv-cgrid"></div><div class="iv-grid" id="iv-fgrid"></div></div>
   </section>
   <section class="iv-panel iv-details"><div class="iv-hd">選択中のパーツ</div><div id="iv-det-body"></div></section>
-  <footer class="iv-controls">十字キー / 左スティック：移動　　L1 / R1・Tab：エリア切替　　× / Enter：決定　　○ / Esc：戻る</footer>
+  <footer class="iv-controls">十字キー / 左スティック：移動　　L1 / R1・Tab：フレーム／コア切替　　× / Enter：決定　　○ / Esc：戻る</footer>
  </div>
 </div>
 
@@ -573,10 +573,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft')  { invNav('left');  e.preventDefault(); }
     if (e.key === 'ArrowRight') { invNav('right'); e.preventDefault(); }
     if (e.key === 'Tab') {
-      if (invSection === 'slots') { invSection = 'frames'; }
-      else if (invSection === 'frames') { invSection = 'cores'; pendingFrameSlot = false; }
-      else { invSection = 'slots'; pendingFrameSlot = false; }
-      pendingSlot = -1; pendingFrameSlot = false;
+      switchInventoryTab();
       e.preventDefault();
     }
 
@@ -844,8 +841,17 @@ let invClosing    = false;
 let invCloseTime  = 0;
 const INV_ANIM_DUR = 0.20;
 let invDirty = false;
-let invLibraryTab = 'cores';
+let invLibraryTab = 'frames';
 const INV_DOM = document.getElementById('inv');
+function switchInventoryTab() {
+  const current = invSection === 'slots' ? invLibraryTab : invSection;
+  invLibraryTab = current === 'frames' ? 'cores' : 'frames';
+  invSection = invLibraryTab;
+  pendingSlot = -1;
+  pendingFrameSlot = false;
+  gp.menuDir = null;
+  invDirty = true;
+}
 function openInventory() {
   inventoryOpen = true; invClosing = false; invOpenTime = performance.now();
   INV_DOM.classList.add('open');
@@ -1580,14 +1586,14 @@ function renderInvDOM() {
   const ef = equippedFrame;
   const fc = ef.cols, fr = ef.rows;
   const hasRar = !!ef.rarity;
-  const rc  = hasRar ? e(f.rarity?.color ?? '#ddd') : '#949494';
+  const rc  = hasRar ? (ef.rarity?.color ?? '#ddd') : '#949494';
   const isFSel  = invSection === 'slots' && invRightCursor === -1;
   const isFPend = pendingFrameSlot;
 
   const fSlot = `<div class="iv-frame-slot${isFSel?' sel':''}${isFPend?' pend':''}" data-a="frame-slot">
     <span class="iv-fs-icon" style="color:${hasRar?rc:'#cccccc'}">grid_view</span>
     <div class="iv-fs-name">${ef.label}</div>
-    <div class="iv-fs-rar" style="color:${rc}">${hasRar?e(f.rarity?.label ?? 'STARTER'):'STARTER'}</div>
+    <div class="iv-fs-rar" style="color:${rc}">${hasRar?(ef.rarity?.label ?? 'STARTER'):'STARTER'}</div>
   </div>`;
 
   const cGrid = `<div class="iv-cores-grid" style="grid-template-columns:repeat(${fc},1fr)">
@@ -1868,12 +1874,7 @@ function updateInput(dt) {
       if (!invClosing) {
         const step = Number(r1 && !prev['_r1']) - Number(l1 && !prev['_l1']);
         if (step) {
-          const sections = ['slots', 'frames', 'cores'];
-          invSection = sections[(sections.indexOf(invSection) + step + sections.length) % sections.length];
-          pendingSlot = -1;
-          pendingFrameSlot = false;
-          gp.menuDir = null;
-          invDirty = true;
+          switchInventoryTab();
         }
       }
     } else if (gp.blockMenuSlash) {
