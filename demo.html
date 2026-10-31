@@ -455,6 +455,22 @@
 .iv-stat-bar {height:8px;margin:0;background:#363636;border-radius:2px;}
 .iv-stat-fill {height:100%;background:#ededed;transform-origin:left;transition:width .48s cubic-bezier(.22,.75,.25,1);border-radius:2px;}
 @media(max-height:650px){.iv-stat-lbl,.iv-stat-val{font-size:13px;}.iv-stat-row{row-gap:4px;grid-template-rows:auto 5px;}.iv-stat-bar{height:5px;}.iv-stats{padding-top:6px;}.iv-loadout{padding-bottom:8px;}}
+
+/* Explicit rows prevent legacy two-column rules from placing stats beside loadout. */
+#iv-equipped {display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:56px minmax(0,1fr);}
+#iv-equipped > .iv-top-body {
+ display:grid;grid-template-columns:minmax(0,1fr);
+ grid-template-rows:minmax(0,1fr) minmax(0,1fr);
+ height:100%;min-height:0;gap:0;padding:0 18px;
+}
+#iv-equipped #iv-loadout {
+ grid-column:1;grid-row:1;min-width:0;min-height:0;
+ padding:0 0 12px;overflow:hidden;
+}
+#iv-equipped #iv-stats {
+ grid-column:1;grid-row:2;min-width:0;min-height:0;
+ margin:0;padding:12px 0;overflow:hidden;
+}
 </style>
 </head>
 <body>
