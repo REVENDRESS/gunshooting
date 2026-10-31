@@ -539,12 +539,10 @@ const RARITIES = [
   { id: 'legendary', label: 'LGD', color: '#ffbf47', weight:  3, mult: 3   },
 ];
 
-const FRAME_DEFS = [
-  { cols: 2, rows: 1, label: '1×2' },
-  { cols: 2, rows: 2, label: '2×2' },
-  { cols: 2, rows: 3, label: '2×3' },
-  { cols: 3, rows: 3, label: '3×3' },
-];
+// Frame notation is always rows × columns (vertical × horizontal).
+const FRAME_DEFS = [[1,2], [2,2], [2,3], [3,3]].map(([rows, cols]) => ({
+  rows, cols, label: `${rows}×${cols}`
+}));
 
 // A fresh starter frame for reset/unequip; never share its mutable slot array.
 function createStarterFrame() {
