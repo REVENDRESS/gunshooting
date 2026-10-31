@@ -536,14 +536,14 @@ window.addEventListener('keydown', e => {
       } else { // 'cores'
         if (dir === 'up') {
           if (invLeftCursor >= invCPerRowCores) invLeftCursor -= invCPerRowCores;
-          else if (pendingSlot === null) invSection = 'slots';
+          else if (pendingSlot < 0) invSection = 'slots';
         }
         if (dir === 'down')  invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + invCPerRowCores);
         if (dir === 'right') invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + 1);
         if (dir === 'left') {
           const col = invLeftCursor % invCPerRowCores;
           if (col > 0) invLeftCursor--;
-          else if (pendingSlot === null) invSection = 'frames';
+          else if (pendingSlot < 0) invSection = 'frames';
         }
       }
     };
@@ -1774,6 +1774,8 @@ INV_DOM.addEventListener('mousedown', e => {
 // ── Update sub-functions ──────────────────────────────────────────────────────
 
 function updateInput(dt) {
+  const inventoryBefore = JSON.stringify([inventoryOpen, invSection, invRightCursor,
+    invFrameCursor, invLeftCursor, pendingSlot, pendingFrameSlot]);
   const allP = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
 
   // Left stick: pick the pad with the most input; require >0.3 to set as main
@@ -1781,14 +1783,14 @@ function updateInput(dt) {
     let bestLx = 0, bestLy = 0;
     for (const p of allP) {
       if (!p || !p.connected) continue;
-      const { x: lx, y: ly } = radialDeadzone(p.axes[0], p.axes[1]);
+      const { x: lx, y: ly } = radialDeadzone(p.axes[0] || 0, p.axes[1] || 0);
       const mag = Math.hypot(lx, ly);
       if (mag > Math.hypot(bestLx, bestLy)) { bestLx = lx; bestLy = ly; }
       if (mag > 0.3) gp.mainPadIndex = p.index;
       // スティック未使用でもボタン入力があればメインパッドとして登録
       if (gp.mainPadIndex < 0 && p.buttons.some(b => b.pressed)) gp.mainPadIndex = p.index;
     }
-    if (Math.hypot(bestLx, bestLy) > 0) {
+    if (!inventoryOpen && !invClosing && Math.hypot(bestLx, bestLy) > 0) {
       keys['_gpL'] = true;
       player.vx = player.vx * Math.pow(0.75, dt) + bestLx * 3.8 * equipStats.speedMult * (1 - Math.pow(0.75, dt));
       player.vy = player.vy * Math.pow(0.75, dt) + bestLy * 3.8 * equipStats.speedMult * (1 - Math.pow(0.75, dt));
@@ -1801,7 +1803,7 @@ function updateInput(dt) {
   {
     const src = gp.mainPadIndex >= 0 ? allP[gp.mainPadIndex] : null;
     if (src) {
-      const { x: rx, y: ry } = radialDeadzone(src.axes[2], src.axes[3]);
+      const { x: rx, y: ry } = radialDeadzone(src.axes[2] || 0, src.axes[3] || 0);
       if (Math.hypot(rx, ry) > 0) {
         const angle = Math.atan2(ry, rx);
         player.angle = angle;
@@ -1936,31 +1938,37 @@ function updateInput(dt) {
         } else { // 'cores'
           if (dir === 'up') {
             if (invLeftCursor >= invCPerRowCores) invLeftCursor -= invCPerRowCores;
-            else if (pendingSlot === null) invSection = 'slots';
+            else if (pendingSlot < 0) invSection = 'slots';
           }
           if (dir === 'down')  invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + invCPerRowCores);
           if (dir === 'right') invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + 1);
           if (dir === 'left') {
             const col = invLeftCursor % invCPerRowCores;
             if (col > 0) invLeftCursor--;
-            else if (pendingSlot === null) invSection = 'frames';
+            else if (pendingSlot < 0) invSection = 'frames';
           }
         }
       };
 
-      const dRight = anyBtn(15);
-      if (dRight && !(prev['_dR'] ?? false)) gpNav('right');
-      prev['_dR'] = dRight;
-      const dLeft = anyBtn(14);
-      if (dLeft && !(prev['_dL'] ?? false)) gpNav('left');
-      prev['_dL'] = dLeft;
-      const dDown = anyBtn(13);
-      if (dDown && !(prev['_dD'] ?? false)) gpNav('down');
-      prev['_dD'] = dDown;
-      const dUp = anyBtn(12);
-      if (dUp && !(prev['_dU'] ?? false)) gpNav('up');
-      prev['_dU'] = dUp;
+      // One shared repeat timer for D-pad and left-stick menu navigation.
+      const pad = allP[gp.mainPadIndex];
+      const sx = pad?.axes[0] || 0, sy = pad?.axes[1] || 0;
+      let dir = anyBtn(15) ? 'right' : anyBtn(14) ? 'left'
+        : anyBtn(13) ? 'down' : anyBtn(12) ? 'up' : null;
+      if (!dir && Math.max(Math.abs(sx), Math.abs(sy)) > 0.55) {
+        dir = Math.abs(sx) > Math.abs(sy)
+          ? (sx > 0 ? 'right' : 'left') : (sy > 0 ? 'down' : 'up');
+      }
+      const now = performance.now();
+      if (dir && (dir !== gp.menuDir || now >= gp.menuNext)) {
+        gpNav(dir);
+        gp.menuNext = now + (dir !== gp.menuDir ? 300 : 110);
+      }
+      gp.menuDir = dir;
+
     }
+
+    if (!inventoryOpen) gp.menuDir = null;
 
     const b9 = anyBtn(9);
     if (b9 && !(prev['_b9'] ?? false)) spawnEnemy();
@@ -1969,6 +1977,10 @@ function updateInput(dt) {
     const b8 = anyBtn(8);
     if (b8 && !(prev['_b8'] ?? false)) location.reload();
     prev['_b8'] = b8;
+  }
+  if (inventoryOpen && inventoryBefore !== JSON.stringify([inventoryOpen, invSection,
+      invRightCursor, invFrameCursor, invLeftCursor, pendingSlot, pendingFrameSlot])) {
+    invDirty = true;
   }
 }
 
