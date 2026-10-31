@@ -474,11 +474,19 @@
 
 #iv-equipped #iv-loadout {container-type:size;}
 #iv-equipped .iv-cores-grid {
- --cell:min(calc((100cqw - (var(--cols) - 1)*8px)/var(--cols)),calc((100cqh - 62px - (var(--rows) - 1)*8px)/var(--rows)));
+ --cell:min(calc((100cqw - 16px)/3),calc((100cqh - 78px)/3));
 }
 #iv-equipped .iv-core-icon {font-size:clamp(28px,4vh,44px)!important;}
 #iv-equipped .iv-core-name {font-size:12px;}
 #iv-equipped .iv-slot-mult {font-size:13px;}
+
+/* All frame variants share the maximum 3x3 cell size. */
+#iv-equipped > .iv-top-body {grid-template-rows:minmax(0,7fr) minmax(0,3fr);}
+#iv-equipped #iv-stats {padding:8px 0;gap:0;}
+#iv-equipped .iv-stat-row {grid-template-rows:auto 5px;row-gap:4px;}
+#iv-equipped .iv-stat-bar {height:5px;}
+#iv-equipped .iv-stat-lbl,#iv-equipped .iv-stat-val {font-size:clamp(12px,1.8vh,16px);line-height:1.2;}
+#iv-equipped .iv-stat-icon {font-size:20px;}
 </style>
 </head>
 <body>
