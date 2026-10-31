@@ -578,7 +578,7 @@ window.addEventListener('keydown', e => {
         // Enter on a core → equip into pending/selected slot, return to slots
         const core = coreInventory[invLeftCursor];
         if (!core) return;
-        const targetSlot = pendingSlot >= 0 ? pendingSlot : invRightCursor;
+        const targetSlot = pendingSlot >= 0 ? pendingSlot : Math.max(0, invRightCursor);
         if (targetSlot < 0) return; // フレームスロット選択中はコア装備不可
         if (core.equippedSlot === targetSlot) {
           delete core.equippedSlot;
@@ -1829,14 +1829,35 @@ function updateInput(dt) {
     mouse.held = r2;
     prev['_r2'] = r2;
 
-    const r1 = anyBtn(5);
-    if (r1 && !(prev['_r1'] ?? false)) player.rightHeld = true;
-    if (!r1 && (prev['_r1'] ?? false)) {
-      if (player.chargeTime >= MAX_CHARGE) doSpinSlash();
-      else doSlash();
-      player.chargeTime = 0;
+    const l1 = anyBtn(4), r1 = anyBtn(5);
+    if (inventoryOpen || invClosing) {
       player.rightHeld = false;
+      player.chargeTime = 0;
+      gp.blockMenuSlash = true;
+      if (!invClosing) {
+        const step = Number(r1 && !prev['_r1']) - Number(l1 && !prev['_l1']);
+        if (step) {
+          const sections = ['slots', 'frames', 'cores'];
+          invSection = sections[(sections.indexOf(invSection) + step + sections.length) % sections.length];
+          pendingSlot = -1;
+          pendingFrameSlot = false;
+          gp.menuDir = null;
+          invDirty = true;
+        }
+      }
+    } else if (gp.blockMenuSlash) {
+      // Require release before restoring combat, including after closing the menu.
+      if (!r1) gp.blockMenuSlash = false;
+    } else {
+      if (r1 && !prev['_r1']) player.rightHeld = true;
+      if (!r1 && prev['_r1']) {
+        if (player.chargeTime >= MAX_CHARGE) doSpinSlash();
+        else doSlash();
+        player.chargeTime = 0;
+        player.rightHeld = false;
+      }
     }
+    prev['_l1'] = l1;
     prev['_r1'] = r1;
 
     const circle = anyBtn(1);
@@ -1879,7 +1900,7 @@ function updateInput(dt) {
         // × on a core → equip it into the pending/selected slot, return to slots
         const core = coreInventory[invLeftCursor];
         if (core) {
-          const targetSlot = pendingSlot >= 0 ? pendingSlot : invRightCursor;
+          const targetSlot = pendingSlot >= 0 ? pendingSlot : Math.max(0, invRightCursor);
           if (core.equippedSlot === targetSlot) {
             delete core.equippedSlot;
             equippedCores[targetSlot] = null;
