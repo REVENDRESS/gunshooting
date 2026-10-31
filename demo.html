@@ -411,6 +411,16 @@
 .iv-controls {grid-column:1/-1;display:flex;align-items:center;justify-content:center;border-top:1px solid #666;color:#eee;font:14px/1.5 sans-serif;}
 @media(max-width:1000px){.iv-win{gap:8px;grid-template-columns:minmax(180px,27fr) minmax(260px,43fr) minmax(200px,30fr);}.iv-card-icon{font-size:24px;}.iv-hd{font-size:16px;padding:12px;}.iv-controls{font-size:11px;}.iv-card-name,.iv-card-val,.iv-card-rar{font-size:9px;}.iv-det-name{font-size:20px;}}
 
+
+.iv-top-body {overflow:hidden;display:grid;grid-template-rows:minmax(0,1fr) 30px 180px;gap:8px;}
+.iv-loadout {min-height:0;display:grid;grid-template-rows:42px minmax(0,1fr);}
+.iv-frame-slot {height:42px;}
+.iv-cores-grid {height:100%;min-height:0;align-content:center;justify-content:center;grid-auto-rows:minmax(0,1fr);}
+.iv-core-slot {min-height:0;max-height:none;width:var(--cell);height:var(--cell);aspect-ratio:1;}
+.iv-stats {gap:4px;}.iv-stat-row {padding:0;}.iv-stat-lbl,.iv-stat-val {font-size:12px;}
+.iv-grid {grid-auto-rows:max-content;align-content:start;}
+.iv-grid>.iv-card,.iv-grid>.iv-empty {width:100%;height:auto;min-height:0;aspect-ratio:1;box-sizing:border-box;margin:0;}
+.iv-card-name,.iv-card-val,.iv-card-rar {font-size:10px;}
 </style>
 </head>
 <body>
@@ -419,7 +429,7 @@
 <div id="inv">
  <div class="iv-bg"></div>
  <div class="iv-win">
-  <header class="iv-title">装備・インベントリ <span id="iv-money"></span></header>
+  <header class="iv-title">INVENTORY <span id="iv-money"></span></header>
   <section class="iv-panel iv-equipped" id="iv-equipped">
    <div class="iv-hd">装備中</div>
    <div class="iv-top-body"><div class="iv-loadout" id="iv-loadout"></div>
@@ -431,7 +441,7 @@
    <div class="iv-lib-body"><div class="iv-grid" id="iv-cgrid"></div><div class="iv-grid" id="iv-fgrid"></div></div>
   </section>
   <section class="iv-panel iv-details"><div class="iv-hd">選択中のパーツ</div><div id="iv-det-body"></div></section>
-  <footer class="iv-controls">十字キー / 左スティック：移動　　L1 / R1・Tab：フレーム／コア切替　　× / Enter：決定　　○ / Esc：戻る</footer>
+  <footer class="iv-controls">十字キー / 左スティック：移動　　L2 / PgUp：装備中　 R2 / PgDn：所持品　 L1 / R1：フレーム／コア　　× / Enter：決定　　○ / Esc：戻る</footer>
  </div>
 </div>
 
@@ -520,53 +530,20 @@ window.addEventListener('keydown', e => {
   if (e.key === '4') toggleSkill(4);
   if (e.key === 'Shift') doDodge();
   if (e.key === 'i' || e.key === 'I') { if (inventoryOpen) { pendingSlot = -1; closeInventory(); } else if (!invClosing) openInventory(); }
+  if (e.key === 'Escape' && inventoryOpen && selectedCore) { selectedCore=null;invDirty=true;return; }
   if (e.key === 'Escape' && inventoryOpen) {
     if (pendingSlot >= 0) { pendingSlot = -1; invSection = 'slots'; }
     else if (pendingFrameSlot) { pendingFrameSlot = false; invSection = 'slots'; invRightCursor = -1; }
     else closeInventory();
   }
 
+  if(inventoryOpen && e.key==='PageUp')inventoryArea('slots');
+  if(inventoryOpen && e.key==='PageDown')inventoryArea('library');
   // Inventory navigation
   if (inventoryOpen) {
     const fc = equippedFrame.cols, fr = equippedFrame.rows;
 
-    const invNav = (dir) => {
-      if (invSection === 'slots') {
-        if (invRightCursor === -1) {
-          if (dir === 'right') invRightCursor = 0;
-        } else {
-          const col = invRightCursor % fc, row = Math.floor(invRightCursor / fc);
-          if (dir === 'left')  invRightCursor = col > 0 ? invRightCursor - 1 : -1;
-          if (dir === 'right') invRightCursor = col < fc-1 ? invRightCursor + 1 : invRightCursor;
-          if (dir === 'up')    invRightCursor = row > 0 ? invRightCursor - fc : invRightCursor;
-          if (dir === 'down')  { if (row < fr-1) invRightCursor += fc; }
-        }
-      } else if (invSection === 'frames') {
-        if (dir === 'up') {
-          if (invFrameCursor >= invCPerRowFrames) invFrameCursor -= invCPerRowFrames;
-          else if (!pendingFrameSlot) { invSection = 'slots'; }
-        }
-        if (dir === 'down')  invFrameCursor = Math.min(Math.max(0, frameInventory.length - 1), invFrameCursor + invCPerRowFrames);
-        if (dir === 'left')  invFrameCursor = Math.max(0, invFrameCursor - 1);
-        if (dir === 'right') {
-          const col = invFrameCursor % invCPerRowFrames;
-          if (col < invCPerRowFrames - 1 && invFrameCursor + 1 < frameInventory.length) invFrameCursor++;
-          else if (!pendingFrameSlot) { invSection = 'cores'; }
-        }
-      } else { // 'cores'
-        if (dir === 'up') {
-          if (invLeftCursor >= invCPerRowCores) invLeftCursor -= invCPerRowCores;
-          else if (pendingSlot < 0) invSection = 'slots';
-        }
-        if (dir === 'down')  invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + invCPerRowCores);
-        if (dir === 'right') invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + 1);
-        if (dir === 'left') {
-          const col = invLeftCursor % invCPerRowCores;
-          if (col > 0) invLeftCursor--;
-          else if (pendingSlot < 0) invSection = 'frames';
-        }
-      }
-    };
+    const invNav = inventoryMove;
 
     if (e.key === 'ArrowUp')    { invNav('up');    e.preventDefault(); }
     if (e.key === 'ArrowDown')  { invNav('down');  e.preventDefault(); }
@@ -577,52 +554,7 @@ window.addEventListener('keydown', e => {
       e.preventDefault();
     }
 
-    const doEquip = () => {
-      if (invSection === 'frames') {
-        const frame = frameInventory[invFrameCursor];
-        if (!frame) return;
-        equippedCores.forEach(c => { if (c) delete c.equippedSlot; });
-        if (frame.isEquipped) {
-          delete frame.isEquipped;
-          equippedFrame = createStarterFrame();
-        } else {
-          if (equippedFrame && equippedFrame.isEquipped) delete equippedFrame.isEquipped;
-          equippedFrame = frame; frame.isEquipped = true;
-        }
-        equippedCores.length = 0;
-        resizeEquippedCores();
-        pendingFrameSlot = false; invSection = 'slots'; invRightCursor = 0;
-      } else if (invSection === 'cores') {
-        // Enter on a core → equip into pending/selected slot, return to slots
-        const core = coreInventory[invLeftCursor];
-        if (!core) return;
-        const targetSlot = pendingSlot >= 0 ? pendingSlot : Math.max(0, invRightCursor);
-        if (targetSlot < 0) return; // フレームスロット選択中はコア装備不可
-        if (core.equippedSlot === targetSlot) {
-          delete core.equippedSlot;
-          equippedCores[targetSlot] = null;
-        } else {
-          if (core.equippedSlot !== undefined) equippedCores[core.equippedSlot] = null;
-          if (equippedCores[targetSlot]) delete equippedCores[targetSlot].equippedSlot;
-          equippedCores[targetSlot] = core;
-          core.equippedSlot = targetSlot;
-        }
-        recalcEquip();
-        invRightCursor = targetSlot;
-        pendingSlot = -1;
-        invSection = 'slots';
-      } else if (invRightCursor === -1) {
-        // フレームスロットでEnter → フレーム一覧に入って選択開始
-        pendingFrameSlot = true; pendingSlot = -1;
-        invSection = 'frames';
-        if (invFrameCursor >= frameInventory.length) invFrameCursor = 0;
-      } else {
-        // Enter on a core slot → start pending (blink), jump to cores
-        pendingSlot = invRightCursor;
-        invSection = 'cores';
-        if (invLeftCursor >= coreInventory.length) invLeftCursor = 0;
-      }
-    };
+    const doEquip = inventoryConfirm;
 
     if (e.key === 'Enter' || e.key === ' ') { doEquip(); e.preventDefault(); }
     if (e.key === 'x' || e.key === 'X' || e.key === 'Backspace') {
@@ -842,8 +774,51 @@ let invCloseTime  = 0;
 const INV_ANIM_DUR = 0.20;
 let invDirty = false;
 let invLibraryTab = 'frames';
+let selectedCore = null;
+function inventoryArea(area) {
+ selectedCore=null; pendingSlot=-1; pendingFrameSlot=false;
+ invSection=area==='slots'?'slots':invLibraryTab;
+ invRightCursor=Math.max(0,invRightCursor);invDirty=true;
+}
+function inventoryConfirm() {
+ if(selectedCore) {
+  const slot=Math.max(0,invRightCursor);
+  if(selectedCore.equippedSlot!==undefined) equippedCores[selectedCore.equippedSlot]=null;
+  if(equippedCores[slot]) delete equippedCores[slot].equippedSlot;
+  equippedCores[slot]=selectedCore;selectedCore.equippedSlot=slot;selectedCore=null;
+ } else if(invSection==='slots') {
+  if(invRightCursor<0) {
+   equippedCores.forEach(c=>{if(c)delete c.equippedSlot;});
+   if(equippedFrame.isEquipped)delete equippedFrame.isEquipped;
+   equippedFrame=createStarterFrame();equippedCores.length=0;resizeEquippedCores();
+  } else {const c=equippedCores[invRightCursor];if(c)delete c.equippedSlot;equippedCores[invRightCursor]=null;}
+ } else if(invSection==='cores') {
+  selectedCore=coreInventory[invLeftCursor]??null;
+  if(selectedCore)invRightCursor=Math.max(0,invRightCursor);
+ } else {
+  const f=frameInventory[invFrameCursor];if(!f)return;
+  equippedCores.forEach(c=>{if(c)delete c.equippedSlot;});
+  if(equippedFrame.isEquipped)delete equippedFrame.isEquipped;
+  equippedFrame=f;f.isEquipped=true;equippedCores.length=0;resizeEquippedCores();invRightCursor=0;
+ }
+ recalcEquip();invDirty=true;
+}
+function inventoryMove(dir) {
+ if(invSection==='slots'||selectedCore){
+  const n=equippedCores.length,cols=equippedFrame.cols;
+  const delta={left:-1,right:1,up:-cols,down:cols}[dir];
+  invRightCursor=Math.max(-1,Math.min(n-1,invRightCursor+delta));
+ } else {
+  const delta={left:-1,right:1,up:-4,down:4}[dir];
+  if(invSection==='frames') invFrameCursor=Math.max(0,Math.min(Math.max(0,frameInventory.length-1),invFrameCursor+delta));
+  else invLeftCursor=Math.max(0,Math.min(Math.max(0,coreInventory.length-1),invLeftCursor+delta));
+ }
+ invDirty=true;
+}
+
 const INV_DOM = document.getElementById('inv');
 function switchInventoryTab() {
+  if(invSection==='slots'||selectedCore)return;
   const current = invSection === 'slots' ? invLibraryTab : invSection;
   invLibraryTab = current === 'frames' ? 'cores' : 'frames';
   invSection = invLibraryTab;
@@ -858,6 +833,7 @@ function openInventory() {
   invDirty = true;
 }
 function closeInventory() {
+  selectedCore=null;
   if (!inventoryOpen) return;
   invClosing = true; invCloseTime = performance.now();
   INV_DOM.classList.remove('open');
@@ -1596,10 +1572,10 @@ function renderInvDOM() {
     <div class="iv-fs-rar" style="color:${rc}">${hasRar?(ef.rarity?.label ?? 'STARTER'):'STARTER'}</div>
   </div>`;
 
-  const cGrid = `<div class="iv-cores-grid" style="grid-template-columns:repeat(${fc},1fr)">
+  const cGrid = `<div class="iv-cores-grid" style="--cell:min(7vh,70px);grid-template-columns:repeat(${fc},var(--cell));grid-template-rows:repeat(${fr},var(--cell))">
     ${Array.from({length:fc*fr},(_,si)=>{
       const core=equippedCores[si];
-      const sel=invSection==='slots'&&invRightCursor===si;
+      const sel=(invSection==='slots'||selectedCore)&&invRightCursor===si;
       const pend=pendingSlot===si;
       const sm=ef.slotMults?.[si]??1.0;
       const smC=sm>1?`rgb(${Math.round(40+(sm-1)*80)},${Math.round(80+(sm-1)*140)},70)`:'#bbbbbb';
@@ -1622,7 +1598,8 @@ function renderInvDOM() {
 
   // ── Detail ──────────────────────────────────────────────────
   let det = null;
-  if (invSection==='slots' && invRightCursor===-1)
+  if(selectedCore) det={kind:'core',data:selectedCore};
+  else if (invSection==='slots' && invRightCursor===-1)
     det = {kind:'frame', data:equippedFrame, eq:true};
   else if (invSection==='frames' && frameInventory[invFrameCursor])
     det = { kind:'frame', data:frameInventory[invFrameCursor] };
@@ -1744,7 +1721,7 @@ function renderInvDOM() {
       detEl.innerHTML += '<div class="iv-comparison">現在 → 装備後' + rows.map(([label,key,p]) =>
         `<div class="iv-compare-row"><span>${label}</span><span>${fmt(equipStats[key],p)} →</span><b>${fmt(preview[key],p)}</b></div>`).join('') + '</div>';
       detEl.innerHTML += det.kind === 'frame' ? '<div class="iv-note">フレーム交換時はコアをすべて取り外します。</div>' : `<div class="iv-note">装着先：スロット ${target+1}<br>装備欄で交換先を選べます。</div>`;
-      detEl.innerHTML += '<button class="iv-equip-button" data-a="equip">'+(det.kind==='core' && det.data.equippedSlot===target?'取り外す':'装備する')+'</button>';
+      detEl.innerHTML += '<button class="iv-equip-button" data-a="equip">'+(det.kind==='core' && det.data.equippedSlot===target?'取り外す':selectedCore?'ここに配置する':det.kind==='core'?'配置先を選ぶ':'装備する')+'</button>';
     }
   }
   document.querySelector('.iv-grid:not([hidden]) .sel')?.scrollIntoView({block:'nearest'});
@@ -1760,48 +1737,13 @@ INV_DOM.addEventListener('mousedown', e => {
   const a = el.dataset.a;
   const idx = el.dataset.idx !== undefined ? +el.dataset.idx : undefined;
 
-  if (a === 'equip') {
-    window.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter'}));
-    window.dispatchEvent(new KeyboardEvent('keyup', {key:'Enter'}));
-  } else if (a === 'tab-cores' || a === 'tab-frames') {
-    invSection = a === 'tab-cores' ? 'cores' : 'frames';
-    pendingSlot = -1; pendingFrameSlot = false;
-  } else if (a === 'frame-slot') {
-    invRightCursor = -1; invSection = 'slots';
-    if (pendingFrameSlot) {
-      if (equippedFrame.rarity) {
-        equippedCores.forEach(c=>{if(c)delete c.equippedSlot;});
-        if (equippedFrame.isEquipped) delete equippedFrame.isEquipped;
-        equippedFrame=createStarterFrame();
-        equippedCores.length=0; resizeEquippedCores();
-      }
-      pendingFrameSlot = false;
-    } else {
-      pendingFrameSlot=true; pendingSlot=-1; invSection='frames';
-      if(invFrameCursor>=frameInventory.length) invFrameCursor=0;
-    }
-  } else if (a === 'slot') {
-    if (pendingFrameSlot) return;
-    invRightCursor = idx;
-    if (pendingSlot === idx) {
-      const sc=equippedCores[pendingSlot];
-      if(sc){delete sc.equippedSlot;equippedCores[pendingSlot]=null;recalcEquip();}
-      pendingSlot=-1; invSection='slots';
-    } else {
-      pendingSlot=idx; invSection='cores';
-      if(invLeftCursor>=coreInventory.length) invLeftCursor=0;
-    }
-  } else if (a === 'frame') {
-    invFrameCursor=idx; invSection='frames'; pendingFrameSlot=false;
-  } else if (a === 'core') {
-    invLeftCursor=idx; invSection='cores'; pendingFrameSlot=false;
-  } else if (a === 'core-bg') {
-    if (pendingSlot>=0) {
-      const bc=equippedCores[pendingSlot];
-      if(bc){delete bc.equippedSlot;equippedCores[pendingSlot]=null;recalcEquip();}
-      pendingSlot=-1; invSection='slots';
-    }
-  }
+  if(a==='equip') inventoryConfirm();
+  else if(a==='tab-cores'||a==='tab-frames') {
+   if(invSection!=='slots'&&!selectedCore)invSection=invLibraryTab=a==='tab-cores'?'cores':'frames';
+  } else if(a==='slot' && (invSection==='slots'||selectedCore)) {invRightCursor=idx;inventoryConfirm();}
+  else if(a==='frame-slot'&&invSection==='slots'){invRightCursor=-1;inventoryConfirm();}
+  else if(a==='core'&&invSection==='cores'&&!selectedCore){invLeftCursor=idx;inventoryConfirm();}
+  else if(a==='frame'&&invSection==='frames'&&!selectedCore){invFrameCursor=idx;inventoryConfirm();}
   invDirty = true;
   e.preventDefault();
 });
@@ -1861,7 +1803,13 @@ function updateInput(dt) {
     const anyVal = (idx) => allP.reduce((m, p) => p && p.connected ? Math.max(m, gpVal(p, idx)) : m, 0);
     const prev = gp.prev;
 
-    const r2 = anyVal(7) > 0.5;
+    const menuL2=anyVal(6)>0.5,menuR2=anyVal(7)>0.5;
+    if(inventoryOpen&&!invClosing){
+     if(menuL2&&!prev.menuL2)inventoryArea('slots');
+     if(menuR2&&!prev.menuR2)inventoryArea('library');
+    }
+    prev.menuL2=menuL2;prev.menuR2=menuR2;
+    const r2 = !inventoryOpen && !invClosing && anyVal(7) > 0.5;
     if (r2 && !(prev['_r2'] ?? false)) tryShoot();
     mouse.held = r2;
     prev['_r2'] = r2;
@@ -1895,14 +1843,15 @@ function updateInput(dt) {
     const circle = anyBtn(1);
     if (circle && !(prev['_b1'] ?? false)) {
       if (inventoryOpen) {
-        if (pendingSlot >= 0) { pendingSlot = -1; invSection = 'slots'; }
+        if(selectedCore){selectedCore=null;invDirty=true;}
+        else if (pendingSlot >= 0) { pendingSlot = -1; invSection = 'slots'; }
         else if (pendingFrameSlot) { pendingFrameSlot = false; invSection = 'slots'; invRightCursor = -1; }
         else closeInventory();
       } else doDodge();
     }
     prev['_b1'] = circle;
 
-    player.guarding = anyVal(6) > 0.5;
+    player.guarding = !inventoryOpen && !invClosing && anyVal(6) > 0.5;
 
     const sq = anyBtn(2);
     prev['_sq'] = sq;
@@ -1912,96 +1861,14 @@ function updateInput(dt) {
     prev['_b3'] = tri;
 
     const cross = anyBtn(0);
-    if (cross && !(prev['_b0'] ?? false) && inventoryOpen) {
-      if (invSection === 'frames') {
-        const frame = frameInventory[invFrameCursor];
-        if (frame) {
-          equippedCores.forEach(c => { if (c) delete c.equippedSlot; });
-          if (frame.isEquipped) {
-            delete frame.isEquipped;
-            equippedFrame = createStarterFrame();
-          } else {
-            if (equippedFrame && equippedFrame.isEquipped) delete equippedFrame.isEquipped;
-            equippedFrame = frame; frame.isEquipped = true;
-          }
-          equippedCores.length = 0;
-          resizeEquippedCores();
-          pendingFrameSlot = false; invSection = 'slots'; invRightCursor = 0;
-        }
-      } else if (invSection === 'cores') {
-        // × on a core → equip it into the pending/selected slot, return to slots
-        const core = coreInventory[invLeftCursor];
-        if (core) {
-          const targetSlot = pendingSlot >= 0 ? pendingSlot : Math.max(0, invRightCursor);
-          if (core.equippedSlot === targetSlot) {
-            delete core.equippedSlot;
-            equippedCores[targetSlot] = null;
-          } else {
-            if (core.equippedSlot !== undefined) equippedCores[core.equippedSlot] = null;
-            if (equippedCores[targetSlot]) delete equippedCores[targetSlot].equippedSlot;
-            equippedCores[targetSlot] = core;
-            core.equippedSlot = targetSlot;
-          }
-          recalcEquip();
-          invRightCursor = targetSlot;
-          pendingSlot = -1;
-          invSection = 'slots';
-        }
-      } else if (invRightCursor === -1) {
-        // × on frame slot → enter frame select mode (orange)
-        pendingFrameSlot = true; pendingSlot = -1;
-        invSection = 'frames';
-        if (invFrameCursor >= frameInventory.length) invFrameCursor = 0;
-      } else {
-        // × on a slot → start blinking that slot, switch to cores to pick
-        pendingSlot = invRightCursor;
-        invSection = 'cores';
-        if (invLeftCursor >= coreInventory.length) invLeftCursor = 0;
-      }
-    }
+    if(cross && !prev['_b0'] && inventoryOpen && !invClosing) inventoryConfirm();
     prev['_b0'] = cross;
 
     // D-pad navigation in inventory
     if (inventoryOpen) {
       const fc = equippedFrame.cols, fr = equippedFrame.rows;
 
-      const gpNav = (dir) => {
-        if (invSection === 'slots') {
-          if (invRightCursor === -1) {
-            if (dir === 'right') invRightCursor = 0;
-          } else {
-          const col = invRightCursor % fc, row = Math.floor(invRightCursor / fc);
-          if (dir === 'left')  invRightCursor = col > 0 ? invRightCursor - 1 : -1;
-          if (dir === 'right') invRightCursor = col < fc-1 ? invRightCursor + 1 : invRightCursor;
-          if (dir === 'up')    invRightCursor = row > 0 ? invRightCursor - fc : invRightCursor;
-          if (dir === 'down')  { if (row < fr-1) invRightCursor += fc; }
-          }
-        } else if (invSection === 'frames') {
-          if (dir === 'up') {
-            if (invFrameCursor >= invCPerRowFrames) invFrameCursor -= invCPerRowFrames;
-            else if (!pendingFrameSlot) { invSection = 'slots'; }
-          }
-          if (dir === 'down')  invFrameCursor = Math.min(Math.max(0, frameInventory.length - 1), invFrameCursor + invCPerRowFrames);
-          if (dir === 'left')  invFrameCursor = Math.max(0, invFrameCursor - 1);
-          if (dir === 'right') {
-            const col = invFrameCursor % invCPerRowFrames;
-            if (col < invCPerRowFrames - 1 && invFrameCursor + 1 < frameInventory.length) invFrameCursor++;
-            else if (!pendingFrameSlot) invSection = 'cores';
-          }
-        } else { // 'cores'
-          if (dir === 'up') {
-            if (invLeftCursor >= invCPerRowCores) invLeftCursor -= invCPerRowCores;
-            else if (pendingSlot < 0) invSection = 'slots';
-          }
-          if (dir === 'down')  invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + invCPerRowCores);
-          if (dir === 'right') invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + 1);
-          if (dir === 'left') {
-            const col = invLeftCursor % invCPerRowCores;
-            if (col > 0) invLeftCursor--;
-            else if (pendingSlot < 0) invSection = 'frames';
-          }
-        }
-      };
+      const gpNav = inventoryMove;
 
       // One shared repeat timer for D-pad and left-stick menu navigation.
       const pad = allP[gp.mainPadIndex];
