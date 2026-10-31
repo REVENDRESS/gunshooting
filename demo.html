@@ -421,6 +421,28 @@
 .iv-grid {grid-auto-rows:max-content;align-content:start;}
 .iv-grid>.iv-card,.iv-grid>.iv-empty {width:100%;height:auto;min-height:0;aspect-ratio:1;box-sizing:border-box;margin:0;}
 .iv-card-name,.iv-card-val,.iv-card-rar {font-size:10px;}
+
+/* Readable comparison and balanced inventory columns. */
+#inv { color:#eeeeee; }
+.iv-comparison,.iv-compare-row,.iv-compare-row span { color:#dedede; }
+.iv-compare-row b { color:#ffffff; }
+.iv-win { grid-template-columns:minmax(250px,34fr) minmax(320px,43fr) minmax(220px,23fr); }
+.iv-top-body { grid-template-rows:minmax(0,1fr) 220px; gap:16px; }
+.iv-stats { border-top:1px solid #666;padding-top:14px;gap:10px; }
+.iv-stat-lbl,.iv-stat-val {font-size:16px;line-height:1.4;}
+.iv-stat-icon {font-size:25px;}
+.iv-card-eq {color:#ffb347!important;font-weight:900;}
+.iv-card.eq::after {background:#ffb347;}
+.iv-det-eq {color:#ffb347;}
+@media(max-width:1000px) {
+ .iv-win {grid-template-columns:minmax(210px,34fr) minmax(260px,43fr) minmax(180px,23fr);}
+ .iv-stat-lbl,.iv-stat-val {font-size:14px;}
+}
+@media(max-height:650px) {
+ .iv-top-body {grid-template-rows:minmax(0,1fr) 170px;gap:8px;}
+ .iv-stats {gap:4px;padding-top:8px;}
+ .iv-stat-lbl,.iv-stat-val {font-size:14px;}
+}
 </style>
 </head>
 <body>
@@ -433,7 +455,7 @@
   <section class="iv-panel iv-equipped" id="iv-equipped">
    <div class="iv-hd">装備中</div>
    <div class="iv-top-body"><div class="iv-loadout" id="iv-loadout"></div>
-    <div class="iv-hd">ステータス</div><div class="iv-stats" id="iv-stats"></div></div>
+    <div class="iv-stats" id="iv-stats"></div></div>
   </section>
   <section class="iv-panel iv-library" id="iv-library">
    <div class="iv-hd">所持品</div>
