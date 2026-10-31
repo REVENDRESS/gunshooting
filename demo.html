@@ -487,6 +487,14 @@
 #iv-equipped .iv-stat-bar {height:5px;}
 #iv-equipped .iv-stat-lbl,#iv-equipped .iv-stat-val {font-size:clamp(12px,1.8vh,16px);line-height:1.2;}
 #iv-equipped .iv-stat-icon {font-size:20px;}
+
+/* Fixed twenty-cell page; square cells fit both available dimensions. */
+.iv-library {display:grid;grid-template-rows:56px 54px minmax(0,1fr) 36px;}
+.iv-library .iv-lib-body {height:100%;min-height:0;padding:0 14px 8px;container-type:size;}
+.iv-library .iv-grid {--tile:min(calc((100cqw - 30px)/4),calc((100cqh - 38px)/5));grid-template-columns:repeat(4,var(--tile));grid-template-rows:repeat(5,var(--tile));grid-auto-rows:var(--tile);gap:8px;justify-content:center;align-content:start;overflow:hidden;height:100%;}
+.iv-library .iv-grid>.iv-card,.iv-library .iv-grid>.iv-empty {width:var(--tile);height:var(--tile);min-height:0;aspect-ratio:1;}
+.iv-pages {display:flex;align-items:center;justify-content:center;gap:18px;color:#eee;font:13px sans-serif;}
+.iv-pages button {background:#333;color:#eee;border:1px solid #777;padding:4px 12px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -504,7 +512,7 @@
   <section class="iv-panel iv-library" id="iv-library">
    <div class="iv-hd">所持品</div>
    <div class="iv-tabs"><button id="iv-fhd" data-a="tab-frames">フレーム</button><button id="iv-chd" data-a="tab-cores">コア</button></div>
-   <div class="iv-lib-body"><div class="iv-grid" id="iv-cgrid"></div><div class="iv-grid" id="iv-fgrid"></div></div>
+   <div class="iv-lib-body"><div class="iv-grid" id="iv-cgrid"></div><div class="iv-grid" id="iv-fgrid"></div></div><div class="iv-pages"><button data-a="page-prev">◀ 前</button><span id="iv-page-label"></span><button data-a="page-next">次 ▶</button></div>
   </section>
   <section class="iv-panel iv-details"><div class="iv-hd">選択中のパーツ</div><div id="iv-det-body"></div></section>
   <footer class="iv-controls">十字キー / 左スティック：移動　　L2 / PgUp：装備中　 R2 / PgDn：所持品　 L1 / R1：フレーム／コア　　× / Enter：決定　　○ / Esc：戻る　 □ / S：整理</footer>
@@ -840,6 +848,15 @@ const INV_ANIM_DUR = 0.20;
 let invDirty = false;
 let invLibraryTab = 'frames';
 let selectedCore = null;
+function changeInventoryPage(step) {
+ if(selectedCore||invSection==='slots')return;
+ const frames=invSection==='frames';
+ const items=frames?frameInventory:coreInventory;
+ const cursor=frames?invFrameCursor:invLeftCursor;
+ const page=Math.max(0,Math.min(Math.max(0,Math.ceil(items.length/20)-1),Math.floor(cursor/20)+step));
+ if(frames)invFrameCursor=page*20;else invLeftCursor=page*20;
+ invDirty=true;
+}
 function sortInventory() {
  if(selectedCore || invSection==='slots') return;
  const rarityRank = item => RARITIES.findIndex(r=>r.id===item.rarity?.id);
@@ -1734,10 +1751,10 @@ function renderInvDOM() {
   const F_COLS=4, F_ROWS=5;
   invCPerRowFrames = F_COLS;
   document.getElementById('iv-fhd').className = 'iv-col-hd'+(invSection==='frames'?' on':'');
-  document.getElementById('iv-fhd').textContent = `フレーム  ${frameInventory.filter(Boolean).length}/20`;
+  document.getElementById('iv-fhd').textContent = `フレーム  ${frameInventory.filter(Boolean).length}個`;
 
   let fHTML='';
-  for(let ii=0;ii<F_COLS*F_ROWS;ii++){
+  for(let ii=Math.floor(invFrameCursor/20)*20;ii<Math.floor(invFrameCursor/20)*20+20;ii++){
     const frame=frameInventory[ii];
     const sel=invSection==='frames'&&invFrameCursor===ii&&!!frame;
     if(!frame){ fHTML+=`<div class="iv-empty"></div>`; continue; }
@@ -1757,10 +1774,10 @@ function renderInvDOM() {
   const C_COLS=4, C_ROWS=5;
   invCPerRowCores = C_COLS;
   document.getElementById('iv-chd').className = 'iv-col-hd'+(invSection==='cores'?' on':'');
-  document.getElementById('iv-chd').textContent = `コア  ${coreInventory.filter(Boolean).length}/20`;
+  document.getElementById('iv-chd').textContent = `コア  ${coreInventory.filter(Boolean).length}個`;
 
   let cHTML='';
-  for(let ii=0;ii<C_COLS*C_ROWS;ii++){
+  for(let ii=Math.floor(invLeftCursor/20)*20;ii<Math.floor(invLeftCursor/20)*20+20;ii++){
     const core=coreInventory[ii];
     const sel=invSection==='cores'&&invLeftCursor===ii&&!!core;
     if(!core){ cHTML+=`<div class="iv-empty" data-a="core-bg"></div>`; continue; }
@@ -1781,6 +1798,9 @@ function renderInvDOM() {
   if (invSection !== 'slots') invLibraryTab = invSection;
   document.getElementById('iv-cgrid').hidden = invLibraryTab !== 'cores';
   document.getElementById('iv-fgrid').hidden = invLibraryTab !== 'frames';
+  const pageItems=invLibraryTab==='frames'?frameInventory:coreInventory;
+  const pageCursor=invLibraryTab==='frames'?invFrameCursor:invLeftCursor;
+  document.getElementById('iv-page-label').textContent=(Math.floor(pageCursor/20)+1)+' / '+Math.max(1,Math.ceil(pageItems.length/20));
   document.getElementById('iv-chd').classList.toggle('on', invLibraryTab === 'cores');
   document.getElementById('iv-fhd').classList.toggle('on', invLibraryTab === 'frames');
   document.getElementById('iv-equipped').classList.toggle('active', invSection === 'slots');
@@ -1817,7 +1837,8 @@ INV_DOM.addEventListener('mousedown', e => {
   const a = el.dataset.a;
   const idx = el.dataset.idx !== undefined ? +el.dataset.idx : undefined;
 
-  if(a==='equip') inventoryConfirm();
+  if(a==='page-prev'||a==='page-next') { changeInventoryPage(a==='page-next'?1:-1); }
+  else if(a==='equip') inventoryConfirm();
   else if(a==='tab-cores'||a==='tab-frames') {
    if(invSection!=='slots'&&!selectedCore)invSection=invLibraryTab=a==='tab-cores'?'cores':'frames';
   } else if(a==='slot' && (invSection==='slots'||selectedCore)) {invRightCursor=idx;inventoryConfirm();}
@@ -2282,11 +2303,11 @@ function updateDrops(dt) {
     if (dist < 18) {
       if (d.kind === 'core') {
         coreInventory.push(d.data);
-        if (coreInventory.length > 20) coreInventory.shift();
+
         pickupLog.push({ label: `${d.data.label}  ${d.data.rarity.label}`, color: d.data.rarity.color, life: 1, slideAge: 0 });
       } else {
         frameInventory.push(d.data);
-        if (frameInventory.length > 20) frameInventory.shift();
+
         pickupLog.push({ label: `${d.data.label}  ${d.data.rarity.label}`, color: d.data.rarity.color, life: 1, slideAge: 0 });
       }
       if (pickupLog.length > 10) pickupLog.shift();
