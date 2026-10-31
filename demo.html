@@ -540,7 +540,7 @@ const RARITIES = [
 ];
 
 const FRAME_DEFS = [
-  { cols: 1, rows: 2, label: '1×2' },
+  { cols: 2, rows: 1, label: '1×2' },
   { cols: 2, rows: 2, label: '2×2' },
   { cols: 2, rows: 3, label: '2×3' },
   { cols: 3, rows: 3, label: '3×3' },
@@ -1692,7 +1692,7 @@ function renderInvDOM() {
       <div class="iv-det-name">${f.label}</div>
       <div class="iv-det-rar" style="color:${(f.rarity?.color ?? '#ddd')}">${(f.rarity?.label ?? 'STARTER')} FRAME</div>
       <div class="iv-divider"></div>
-      ${[['サイズ',`${f.cols} × ${f.rows}`],['スロット数',`${f.cols*f.rows}`]].map(([l,v])=>`
+      ${[['サイズ',f.label],['スロット数',`${f.cols*f.rows}`]].map(([l,v])=>`
         <div class="iv-det-meta">
           <span class="iv-det-ml">${l}</span>
           <span class="iv-det-mv" style="color:#a4a4a4">${v}</span>
