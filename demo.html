@@ -1,0 +1,3149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>GunShooter — MONO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #080808;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Orbitron', monospace;
+  }
+  canvas { display: block; cursor: none; }
+
+  /* ════════════════════════════════════════════════════
+     INVENTORY  —  2025 Dark Game UI
+     ════════════════════════════════════════════════════ */
+  :root {
+    --iv-void:    #202020;
+    --iv-card:    #303030;
+    --iv-card-hi: #454545;
+    --iv-gold:    #ffffff;
+    --iv-text:    #f5f5f5;
+    --iv-muted:   #d0d0d0;
+    --iv-dim:     #b8b8b8;
+    --iv-gap:     5px;
+  }
+
+  #inv {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #inv.open { pointer-events: all; }
+
+  .iv-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(2,2,2, 0.88);
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+  #inv.open .iv-bg { opacity: 1; }
+
+  .iv-win {
+    position: relative;
+    width: min(93vw, 1100px);
+    height: min(88vh, 700px);
+    display: grid;
+    grid-template-rows: 40% 1fr;
+    gap: var(--iv-gap);
+    clip-path: inset(50% 0 50% 0);
+    transition: clip-path 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #inv.open .iv-win { clip-path: inset(0% 0 0% 0); }
+
+  /* ── Panel base ── */
+  .iv-panel {
+    background: var(--iv-void);
+    overflow: hidden;
+    position: relative;
+  }
+  .iv-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg,
+      transparent 4%, rgba(148,148,148,0.70) 28%,
+      rgba(148,148,148,0.70) 72%, transparent 96%);
+    pointer-events: none;
+  }
+  .iv-hd {
+    padding: 10px 16px 0;
+    font: 700 9px/1 Orbitron, monospace;
+    letter-spacing: .22em;
+    color: #dddddd;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  /* ── Top panel ── */
+  .iv-top-body {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    height: calc(100% - 26px);
+    padding: 0 14px 8px;
+    gap: 14px;
+  }
+
+  /* Stats column */
+  .iv-stats {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    border-right: 1px solid rgba(255,255,255,.22);
+    padding-right: 14px;
+  }
+  .iv-stat-row {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    column-gap: 7px;
+    padding: 4px 0 0;
+  }
+  .iv-stat-icon {
+    font: 14px/1 'Material Symbols Rounded';
+    color: var(--iv-dim);
+    text-align: center;
+  }
+  .iv-stat-icon.on { color: var(--iv-text); }
+  .iv-stat-lbl {
+    font: 700 9px/1 Orbitron;
+    letter-spacing: .12em;
+    color: var(--iv-dim);
+  }
+  .iv-stat-val {
+    font: 700 9px/1 Orbitron;
+    color: var(--iv-muted);
+    text-align: right;
+  }
+  .iv-stat-bar {
+    grid-column: 2 / -1;
+    height: 2px;
+    background: rgba(255,255,255,.05);
+    margin-top: 3px;
+    overflow: hidden;
+  }
+  .iv-stat-fill {
+    height: 100%;
+    transition: width .3s ease;
+  }
+
+  /* Loadout */
+  .iv-loadout {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    overflow: hidden;
+  }
+
+  /* Frame slot */
+  .iv-frame-slot {
+    flex-shrink: 0;
+    width: 78px; height: 78px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--iv-card);
+    cursor: pointer;
+    transition: background .15s;
+    position: relative;
+    user-select: none;
+  }
+  .iv-frame-slot:hover { background: var(--iv-card-hi); }
+  .iv-frame-slot::after {
+    content: ''; position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+    transition: background .15s;
+  }
+  .iv-frame-slot.sel::after,
+  .iv-frame-slot.pend::after { background: rgba(148,148,148,.75); }
+  .iv-frame-slot.pend { background: rgba(151,151,151,.09); }
+  .iv-fs-icon {
+    font: 26px/1 'Material Symbols Rounded';
+    color: #cccccc;
+    transition: color .15s;
+  }
+  .iv-frame-slot.sel .iv-fs-icon,
+  .iv-frame-slot.pend .iv-fs-icon { color: var(--iv-gold); }
+  .iv-fs-name {
+    font: 700 9px/1 Orbitron;
+    color: var(--iv-dim);
+    margin-top: 5px;
+    letter-spacing: .07em;
+    transition: color .15s;
+  }
+  .iv-frame-slot.sel .iv-fs-name,
+  .iv-frame-slot.pend .iv-fs-name { color: var(--iv-muted); }
+  .iv-fs-rar {
+    font: 9px/1 Orbitron;
+    margin-top: 2px;
+    letter-spacing: .08em;
+  }
+
+  /* Core slots grid */
+  .iv-cores-grid {
+    display: grid;
+    gap: 6px;
+    align-content: center;
+  }
+  .iv-core-slot {
+    width: 68px; height: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--iv-card);
+    cursor: pointer;
+    transition: background .15s;
+    position: relative;
+    user-select: none;
+  }
+  .iv-core-slot:hover { background: var(--iv-card-hi); }
+  .iv-core-slot::after {
+    content: ''; position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+    transition: background .15s;
+  }
+  .iv-core-slot.sel::after { background: rgba(148,148,148,.7); }
+  .iv-core-slot.pend::after { background: rgba(151,151,151,.7); }
+  .iv-core-slot.pend { background: rgba(151,151,151,.07); }
+  .iv-core-icon {
+    font: 22px/1 'Material Symbols Rounded';
+    color: var(--iv-dim);
+    transition: color .15s;
+  }
+  .iv-slot-mult {
+    position: absolute;
+    bottom: 3px; left: 4px;
+    font: 9px/1 Orbitron;
+    color: var(--iv-dim);
+  }
+  .iv-core-name {
+    font: 700 9px/1 Orbitron;
+    color: var(--iv-dim);
+    margin-top: 3px;
+    transition: color .15s;
+  }
+  .iv-core-slot.sel .iv-core-name { color: var(--iv-muted); }
+
+  /* ── Bottom row ── */
+  .iv-bottom {
+    display: grid;
+    grid-template-columns: 30% 1fr;
+    gap: var(--iv-gap);
+  }
+
+  /* Detail panel */
+  #iv-det-body {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .iv-det-empty {
+    margin-top: 38%;
+    font: 9px/1 Orbitron;
+    letter-spacing: .16em;
+    color: var(--iv-dim);
+  }
+  .iv-det-icon { font: 38px/1 'Material Symbols Rounded'; margin-top: 14px; }
+  .iv-det-name { font: 700 12px/1.2 Orbitron; color: var(--iv-text); margin-top: 7px; letter-spacing:.05em; text-align:center; }
+  .iv-det-rar  { font: 9px/1 Orbitron; letter-spacing: .14em; margin-top: 4px; }
+  .iv-divider  { width:60%; height:1px; background: linear-gradient(90deg,transparent,rgba(148,148,148,.38),transparent); margin: 10px 0; }
+  .iv-det-eff  { font: 700 14px/1 Orbitron; letter-spacing:.04em; margin-bottom:2px; }
+  .iv-det-sub  { font: 700 9px/1 Orbitron; letter-spacing:.14em; color:var(--iv-dim); margin:8px 0 4px; }
+  .iv-det-bonus {
+    width:100%; display:grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items:center; gap:6px;
+    padding: 5px 8px; margin-top:3px;
+    background: rgba(255,255,255,.025);
+  }
+  .iv-det-bi  { font: 13px/1 'Material Symbols Rounded'; }
+  .iv-det-bv  { font: 700 9.5px/1 Orbitron; text-align:right; }
+  .iv-det-meta { width:100%; display:flex; justify-content:space-between; padding:3px 0; margin-top:3px; }
+  .iv-det-ml   { font: 9px/1 Orbitron; color:var(--iv-dim); letter-spacing:.10em; }
+  .iv-det-mv   { font: 700 10px/1 Orbitron; color:var(--iv-muted); }
+  .iv-det-eq   { margin-top:8px; font:700 9px/1 Orbitron; letter-spacing:.12em; color:#a0a0a0; }
+  .iv-mult-grid { display:grid; gap:2px; margin-top:6px; }
+  .iv-mult-cell { display:flex; align-items:center; justify-content:center; font:700 8px/1 Orbitron; color:#ffffff; }
+
+  /* Library panel */
+  .iv-lib-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    height: calc(100% - 26px);
+    padding: 0 8px 6px;
+    gap: 10px;
+  }
+  .iv-lib-col { display:flex; flex-direction:column; overflow:hidden; }
+  .iv-col-hd {
+    font: 700 9px/1 Orbitron;
+    letter-spacing: .15em;
+    color: var(--iv-dim);
+    padding: 6px 4px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,.22);
+    flex-shrink: 0;
+    transition: color .15s;
+    user-select: none;
+  }
+  .iv-col-hd.on { color: var(--iv-gold); }
+
+  .iv-grid {
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 3px;
+    padding: 4px 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    align-content: start;
+  }
+  .iv-grid::-webkit-scrollbar { display:none; }
+
+  /* Cards */
+  .iv-card {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--iv-card);
+    cursor: pointer;
+    transition: background .12s, transform .12s;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+  }
+  .iv-card:hover { background: var(--iv-card-hi); transform: translateY(-1px); }
+  .iv-card::after {
+    content: ''; position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .iv-card.sel { background: #505050; }
+  .iv-card.sel::after { background: var(--iv-gold); opacity: .75; }
+  .iv-card.eq::after  { background: #dddddd; opacity: .65; }
+  .iv-rar-bar { position:absolute; top:0; left:0; right:0; height:2px; }
+  .iv-card-icon { font: 17px/1 'Material Symbols Rounded'; }
+  .iv-card-name {
+    font: 700 9px/1 Orbitron; letter-spacing:.03em;
+    color: var(--iv-dim); margin-top:3px;
+    max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    transition: color .12s;
+  }
+  .iv-card.sel .iv-card-name { color: var(--iv-text); }
+  .iv-card-val  { font: 700 9px/1 Orbitron; margin-top:1px; }
+  .iv-card-rar  { font: 9px/1 Orbitron; letter-spacing:.07em; color:var(--iv-dim); margin-top:1px; }
+  .iv-card.sel .iv-card-rar { opacity:.9; }
+  .iv-card-eq   { position:absolute; top:3px; right:3px; font:700 9px/1 Orbitron; }
+  .iv-empty {
+    aspect-ratio: 1;
+    display: flex; align-items:center; justify-content:center;
+    background: #252525;
+    font: 9px/1 Orbitron; color: var(--iv-dim);
+  }
+
+
+  .iv-panel { border: 1px solid #484848; }
+  .iv-card, .iv-core-slot, .iv-frame-slot { box-shadow: inset 0 0 0 1px #4a4a4a; }
+  .iv-card.sel, .iv-core-slot.sel, .iv-frame-slot.sel,
+  .iv-core-slot.pend, .iv-frame-slot.pend {
+    background: #505050;
+    box-shadow: inset 0 0 0 2px #eeeeee;
+  }
+  .iv-card-val { color: #eeeeee; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="inv">
+  <div class="iv-bg"></div>
+  <div class="iv-win">
+
+    <!-- TOP: EQUIPPED LOADOUT -->
+    <div class="iv-panel">
+      <div class="iv-hd">Equipped Loadout</div>
+      <div class="iv-top-body">
+        <div class="iv-stats" id="iv-stats"></div>
+        <div class="iv-loadout" id="iv-loadout"></div>
+      </div>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="iv-bottom">
+
+      <!-- BOTTOM LEFT: ITEM DETAIL -->
+      <div class="iv-panel">
+        <div class="iv-hd">Item Detail</div>
+        <div id="iv-det-body"></div>
+      </div>
+
+      <!-- BOTTOM RIGHT: INVENTORY -->
+      <div class="iv-panel">
+        <div class="iv-hd">Inventory</div>
+        <div class="iv-lib-body">
+          <div class="iv-lib-col">
+            <div class="iv-col-hd" id="iv-fhd">FRAMES  0/20</div>
+            <div class="iv-grid" id="iv-fgrid"></div>
+          </div>
+          <div class="iv-lib-col">
+            <div class="iv-col-hd" id="iv-chd">CORES  0/20</div>
+            <div class="iv-grid" id="iv-cgrid"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// Visual source of truth: design_mock.html (Mono + Accent).
+const THEME = Object.freeze({
+  bg: '#080808', floor: '#101010', wallLow: '#161616', wallHigh: '#282828',
+  wallStrong: '#343434', mid: '#888888', hi: '#cccccc', white: '#ffffff',
+  red: '#cc1111', blue: '#1a5faa', blueHi: '#5ab4ff',
+  wallColors: Object.freeze(['#161616', '#282828', '#343434'])
+});
+
+</script>
+<script>
+const C = document.getElementById('c');
+const ctx = C.getContext('2d');
+let W, H;
+function resize() { W = C.width = window.innerWidth; H = C.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+</script>
+<script>
+// ── Core system definitions ───────────────────────────────────────────────────
+const CORE_DEFS = [
+  { type: 'bullet',     label: 'BULLET',    desc: '+1 shot' },
+  { type: 'speed',      label: 'SPEED',     desc: '+20% speed' },
+  { type: 'slash',      label: 'SLASH',     desc: '+15% slash range' },
+  { type: 'orbit',      label: 'ORBIT',     desc: '+1 orbit' },
+  { type: 'orbitspeed', label: 'ORBITSPD',  desc: '+orbit speed' },
+  { type: 'shield',     label: 'SHIELD',    desc: '+guard' },
+];
+const RARITIES = [
+  { id: 'common',    label: 'CMN', color: '#dddddd', weight: 60, mult: 1   },
+  { id: 'rare',      label: 'RAR', color: '#60b4ff', weight: 25, mult: 1.5 },
+  { id: 'epic',      label: 'EPC', color: '#c084fc', weight: 12, mult: 2   },
+  { id: 'legendary', label: 'LGD', color: '#ffbf47', weight:  3, mult: 3   },
+];
+
+const FRAME_DEFS = [
+  { cols: 1, rows: 2, label: '1×2' },
+  { cols: 2, rows: 2, label: '2×2' },
+  { cols: 2, rows: 3, label: '2×3' },
+  { cols: 3, rows: 3, label: '3×3' },
+];
+
+// A fresh starter frame for reset/unequip; never share its mutable slot array.
+function createStarterFrame() {
+  return { cols: 2, rows: 2, label: "2×2", rarity: null, slotMults: [1, 1, 1, 1] };
+}
+
+</script>
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const TILE      = 9;          // dungeon tile size in pixels
+const DW        = 180;        // dungeon width in tiles
+const DH        = 135;        // dungeon height in tiles
+const DOX       = -Math.floor(DW / 2) * TILE;  // dungeon world origin X
+const DOY       = -Math.floor(DH / 2) * TILE;  // dungeon world origin Y
+const CELL      = 11;         // enemy cell render size
+const GAP       = 0;          // enemy cell gap (reserved)
+const BLOCK     = 11;         // enemy cell grid stride
+const SIZES     = [2, 3, 4, 5]; // enemy grid sizes to choose from
+const MAX_CHARGE = 70;        // frames to reach full spin-slash charge
+const DEADZONE  = 0.15;       // gamepad radial dead-zone threshold
+const FRAME_MS  = 1000 / 60; // target frame duration
+const CORE_ICON = { bullet:'target', speed:'sprint', slash:'swords', orbit:'orbit', orbitspeed:'bolt' };
+const FRAME_ICON = 'grid_view';
+function matIcon(name, size, ctx2) { ctx2.font = `${size}px 'Material Symbols Rounded'`; }
+
+// ── Canvas & camera ──────────────────────────────────────────────────────────
+let camX = 0, camY = 0, shake = 0, hitStop = 0;
+
+// ── FPS tracking ─────────────────────────────────────────────────────────────
+let fps = 0, fpsFrameCount = 0, fpsLastTime = performance.now();
+
+// ── Input ────────────────────────────────────────────────────────────────────
+const keys  = {};
+const mouse = { x: 0, y: 0, realX: 0, realY: 0, held: false, hasMoved: false };
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === 'r' || e.key === 'R') spawnEnemy();
+  if (e.key === '1') toggleSkill(1);
+  if (e.key === '2') toggleSkill(2);
+  if (e.key === '3') toggleSkill(3);
+  if (e.key === '4') toggleSkill(4);
+  if (e.key === 'Shift') doDodge();
+  if (e.key === 'i' || e.key === 'I') { if (inventoryOpen) { pendingSlot = -1; closeInventory(); } else if (!invClosing) openInventory(); }
+  if (e.key === 'Escape' && inventoryOpen) {
+    if (pendingSlot >= 0) { pendingSlot = -1; invSection = 'slots'; }
+    else if (pendingFrameSlot) { pendingFrameSlot = false; invSection = 'slots'; invRightCursor = -1; }
+    else closeInventory();
+  }
+
+  // Inventory navigation
+  if (inventoryOpen) {
+    const fc = equippedFrame.cols, fr = equippedFrame.rows;
+
+    const invNav = (dir) => {
+      if (invSection === 'slots') {
+        if (invRightCursor === -1) {
+          if (dir === 'right') invRightCursor = 0;
+        } else {
+          const col = invRightCursor % fc, row = Math.floor(invRightCursor / fc);
+          if (dir === 'left')  invRightCursor = col > 0 ? invRightCursor - 1 : -1;
+          if (dir === 'right') invRightCursor = col < fc-1 ? invRightCursor + 1 : invRightCursor;
+          if (dir === 'up')    invRightCursor = row > 0 ? invRightCursor - fc : invRightCursor;
+          if (dir === 'down')  { if (row < fr-1) invRightCursor += fc; }
+        }
+      } else if (invSection === 'frames') {
+        if (dir === 'up') {
+          if (invFrameCursor >= invCPerRowFrames) invFrameCursor -= invCPerRowFrames;
+          else if (!pendingFrameSlot) { invSection = 'slots'; }
+        }
+        if (dir === 'down')  invFrameCursor = Math.min(Math.max(0, frameInventory.length - 1), invFrameCursor + invCPerRowFrames);
+        if (dir === 'left')  invFrameCursor = Math.max(0, invFrameCursor - 1);
+        if (dir === 'right') {
+          const col = invFrameCursor % invCPerRowFrames;
+          if (col < invCPerRowFrames - 1 && invFrameCursor + 1 < frameInventory.length) invFrameCursor++;
+          else if (!pendingFrameSlot) { invSection = 'cores'; }
+        }
+      } else { // 'cores'
+        if (dir === 'up') {
+          if (invLeftCursor >= invCPerRowCores) invLeftCursor -= invCPerRowCores;
+          else if (pendingSlot === null) invSection = 'slots';
+        }
+        if (dir === 'down')  invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + invCPerRowCores);
+        if (dir === 'right') invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + 1);
+        if (dir === 'left') {
+          const col = invLeftCursor % invCPerRowCores;
+          if (col > 0) invLeftCursor--;
+          else if (pendingSlot === null) invSection = 'frames';
+        }
+      }
+    };
+
+    if (e.key === 'ArrowUp')    { invNav('up');    e.preventDefault(); }
+    if (e.key === 'ArrowDown')  { invNav('down');  e.preventDefault(); }
+    if (e.key === 'ArrowLeft')  { invNav('left');  e.preventDefault(); }
+    if (e.key === 'ArrowRight') { invNav('right'); e.preventDefault(); }
+    if (e.key === 'Tab') {
+      if (invSection === 'slots') { invSection = 'frames'; }
+      else if (invSection === 'frames') { invSection = 'cores'; pendingFrameSlot = false; }
+      else { invSection = 'slots'; pendingFrameSlot = false; }
+      e.preventDefault();
+    }
+
+    const doEquip = () => {
+      if (invSection === 'frames') {
+        const frame = frameInventory[invFrameCursor];
+        if (!frame) return;
+        equippedCores.forEach(c => { if (c) delete c.equippedSlot; });
+        if (frame.isEquipped) {
+          delete frame.isEquipped;
+          equippedFrame = createStarterFrame();
+        } else {
+          if (equippedFrame && equippedFrame.isEquipped) delete equippedFrame.isEquipped;
+          equippedFrame = frame; frame.isEquipped = true;
+        }
+        equippedCores.length = 0;
+        resizeEquippedCores();
+        pendingFrameSlot = false; invSection = 'slots'; invRightCursor = 0;
+      } else if (invSection === 'cores') {
+        // Enter on a core → equip into pending/selected slot, return to slots
+        const core = coreInventory[invLeftCursor];
+        if (!core) return;
+        const targetSlot = pendingSlot >= 0 ? pendingSlot : invRightCursor;
+        if (targetSlot < 0) return; // フレームスロット選択中はコア装備不可
+        if (core.equippedSlot === targetSlot) {
+          delete core.equippedSlot;
+          equippedCores[targetSlot] = null;
+        } else {
+          if (core.equippedSlot !== undefined) equippedCores[core.equippedSlot] = null;
+          if (equippedCores[targetSlot]) delete equippedCores[targetSlot].equippedSlot;
+          equippedCores[targetSlot] = core;
+          core.equippedSlot = targetSlot;
+        }
+        recalcEquip();
+        invRightCursor = targetSlot;
+        pendingSlot = -1;
+        invSection = 'slots';
+      } else if (invRightCursor === -1) {
+        // フレームスロットでEnter → フレーム一覧に入って選択開始
+        pendingFrameSlot = true; pendingSlot = -1;
+        invSection = 'frames';
+        if (invFrameCursor >= frameInventory.length) invFrameCursor = 0;
+      } else {
+        // Enter on a core slot → start pending (blink), jump to cores
+        pendingSlot = invRightCursor;
+        invSection = 'cores';
+        if (invLeftCursor >= coreInventory.length) invLeftCursor = 0;
+      }
+    };
+
+    if (e.key === 'Enter' || e.key === ' ') { doEquip(); e.preventDefault(); }
+    if (e.key === 'x' || e.key === 'X' || e.key === 'Backspace') {
+      if (invSection === 'frames' || pendingFrameSlot || (invSection === 'slots' && invRightCursor === -1)) {
+        // フレームを外す → デフォルト2×2に戻す
+        if (equippedFrame.rarity) {
+          equippedCores.forEach(c => { if (c) delete c.equippedSlot; });
+          if (equippedFrame.isEquipped) delete equippedFrame.isEquipped;
+          equippedFrame = createStarterFrame();
+          equippedCores.length = 0; resizeEquippedCores();
+        }
+        pendingFrameSlot = false; invSection = 'slots'; invRightCursor = -1;
+      } else {
+        // Unequip core from selected slot
+        const uc = equippedCores[invRightCursor];
+        if (uc) {
+          delete uc.equippedSlot;
+          equippedCores[invRightCursor] = null;
+          recalcEquip();
+        }
+      }
+      e.preventDefault();
+    }
+    invDirty = true;
+  }
+});
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+C.addEventListener('mousemove', e => {
+  const rect = C.getBoundingClientRect();
+  mouse.realX = e.clientX - rect.left;
+  mouse.realY = e.clientY - rect.top;
+  mouse.x = mouse.realX; mouse.y = mouse.realY;
+  mouse.hasMoved = true;
+});
+C.addEventListener('mousedown', e => {
+  if (inventoryOpen) { e.preventDefault(); return; } // handled by DOM overlay
+  if (e.button === 0) { mouse.held = true; tryShoot(); }
+  if (e.button === 2) { player.rightHeld = true; }
+  if (e.button === 1) player.guarding = true;
+});
+C.addEventListener('mouseup', e => {
+  if (e.button === 0) mouse.held = false;
+  if (inventoryOpen || invClosing) return;
+  if (e.button === 2) {
+    if (player.chargeTime >= MAX_CHARGE) doSpinSlash();
+    else doSlash();
+    player.chargeTime = 0;
+    player.rightHeld = false;
+  }
+  if (e.button === 1) player.guarding = false;
+});
+C.addEventListener('contextmenu', e => e.preventDefault());
+
+// ── Gamepad state ─────────────────────────────────────────────────────────────
+const gp = { prev: {}, aimActive: false, activeIndex: -1, mainPadIndex: -1 };
+function gpBtn(pad, i) { return pad.buttons[i]?.pressed ?? false; }
+function gpVal(pad, i) { return pad.buttons[i]?.value ?? 0; }
+// Radial dead-zone: reject input below threshold as a unit
+function radialDeadzone(x, y) {
+  const mag = Math.hypot(x, y);
+  if (mag < DEADZONE) return { x: 0, y: 0 };
+  return { x, y };
+}
+
+// ── Skills ───────────────────────────────────────────────────────────────────
+const activeSkills = new Set();
+function toggleSkill(n) {
+  if (activeSkills.has(n)) activeSkills.delete(n); else activeSkills.add(n);
+  document.querySelectorAll('.sk').forEach((el, i) => {
+    el.classList.toggle('active', activeSkills.has(i + 1));
+  });
+}
+
+// ── Dungeon ───────────────────────────────────────────────────────────────────
+let dungeon = [];
+let dungeonRooms = [];
+
+function tileAt(wx, wy) {
+  const tx = Math.floor((wx - DOX) / TILE);
+  const ty = Math.floor((wy - DOY) / TILE);
+  if (tx < 0 || tx >= DW || ty < 0 || ty >= DH) return 999;
+  return dungeon[ty][tx];
+}
+
+function damageWall(tx, ty, hitX, hitY, hitAngle = Math.random() * Math.PI * 2) {
+  if (tx < 0 || tx >= DW || ty < 0 || ty >= DH) return;
+  if (dungeon[ty][tx] <= 0 || dungeon[ty][tx] >= 999) return;
+  dungeon[ty][tx]--;
+  shake = Math.max(shake, 2);
+
+  for (let i = 0; i < 2; i++) {
+    const a = hitAngle + (Math.random() - 0.5) * 2.2;
+    const spd = 3 + Math.random() * 8;
+    shards.push({ x: hitX, y: hitY,
+      vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+      rot: Math.random()*Math.PI*2, rotV: (Math.random()-0.5)*0.3,
+      life: 1, decay: 0.03 + Math.random()*0.02, isCore: false,
+      size: 4 + Math.random() * 8 });
+  }
+  for (let i = 0; i < 2; i++) {
+    const a = hitAngle + (Math.random() - 0.5) * 1.8;
+    sparks.push({ x: hitX, y: hitY,
+      vx: Math.cos(a)*(3+Math.random()*6), vy: Math.sin(a)*(3+Math.random()*6),
+      life: 1, decay: 0.06+Math.random()*0.05, r: 1.5, isCore: false });
+  }
+}
+
+function generateDungeon() {
+  dungeon = [];
+  for (let ty = 0; ty < DH; ty++) {
+    dungeon[ty] = [];
+    for (let tx = 0; tx < DW; tx++)
+      dungeon[ty][tx] = (tx === 0 || tx === DW-1 || ty === 0 || ty === DH-1) ? 999 : 2;
+  }
+
+  dungeonRooms = [];
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const rw = 18 + Math.floor(Math.random() * 26);
+    const rh = 15 + Math.floor(Math.random() * 20);
+    const rx = 6 + Math.floor(Math.random() * (DW - rw - 12));
+    const ry = 6 + Math.floor(Math.random() * (DH - rh - 12));
+    let ok = true;
+    for (const r of dungeonRooms) {
+      if (rx < r.x+r.w+6 && rx+rw+6 > r.x && ry < r.y+r.h+6 && ry+rh+6 > r.y) { ok=false; break; }
+    }
+    if (!ok) continue;
+    for (let ty = ry; ty < ry+rh; ty++)
+      for (let tx = rx; tx < rx+rw; tx++)
+        dungeon[ty][tx] = 0;
+    dungeonRooms.push({ x:rx, y:ry, w:rw, h:rh });
+  }
+
+  // Connect rooms with L-shaped corridors (9 tiles wide ≈ 63px)
+  for (let i = 1; i < dungeonRooms.length; i++) {
+    const a = dungeonRooms[i-1], b = dungeonRooms[i];
+    const ax = Math.floor(a.x + a.w/2), ay = Math.floor(a.y + a.h/2);
+    const bx = Math.floor(b.x + b.w/2), by = Math.floor(b.y + b.h/2);
+    for (let tx = Math.min(ax,bx); tx <= Math.max(ax,bx); tx++)
+      for (let dy = -4; dy <= 4; dy++)
+        if (ay+dy >= 0 && ay+dy < DH) dungeon[ay+dy][tx] = 0;
+    for (let ty = Math.min(ay,by); ty <= Math.max(ay,by); ty++)
+      for (let dx = -4; dx <= 4; dx++)
+        if (bx+dx >= 0 && bx+dx < DW) dungeon[ty][bx+dx] = 0;
+  }
+
+  if (dungeonRooms.length > 0) {
+    const r = dungeonRooms[0];
+    player.x = DOX + (r.x + r.w/2) * TILE;
+    player.y = DOY + (r.y + r.h/2) * TILE;
+  }
+}
+
+function resolveWall(obj, radius) {
+  if (!dungeon.length) return;
+  const txMin = Math.floor((obj.x - radius - DOX) / TILE);
+  const txMax = Math.floor((obj.x + radius - DOX) / TILE);
+  const tyMin = Math.floor((obj.y - radius - DOY) / TILE);
+  const tyMax = Math.floor((obj.y + radius - DOY) / TILE);
+  for (let ty = tyMin; ty <= tyMax; ty++) {
+    for (let tx = txMin; tx <= txMax; tx++) {
+      const hp = (tx < 0 || tx >= DW || ty < 0 || ty >= DH) ? 999 : dungeon[ty][tx];
+      if (hp <= 0) continue;
+      const wx = DOX + tx * TILE, wy = DOY + ty * TILE;
+      const overR = (obj.x + radius) - wx;
+      const overL = (wx + TILE) - (obj.x - radius);
+      const overB = (obj.y + radius) - wy;
+      const overT = (wy + TILE) - (obj.y - radius);
+      if (overR > 0 && overL > 0 && overB > 0 && overT > 0) {
+        if (Math.min(overR, overL) < Math.min(overB, overT)) {
+          if (overR < overL) { obj.x -= overR; if (obj.vx > 0) obj.vx = 0; }
+          else               { obj.x += overL; if (obj.vx < 0) obj.vx = 0; }
+        } else {
+          if (overB < overT) { obj.y -= overB; if (obj.vy > 0) obj.vy = 0; }
+          else               { obj.y += overT; if (obj.vy < 0) obj.vy = 0; }
+        }
+      }
+    }
+  }
+}
+
+// ── Enemy grid helpers ────────────────────────────────────────────────────────
+function makeGrid(cols, rows) {
+  const cc = Math.floor(cols / 2), cr = Math.floor(rows / 2);
+  const spread = cols >= 4 ? 1 : 0;
+  const coreC = cc + Math.floor(Math.random() * (spread*2+1)) - spread;
+  const coreR = cr + Math.floor(Math.random() * (spread*2+1)) - spread;
+  const g = [];
+  for (let r = 0; r < rows; r++) {
+    g[r] = [];
+    for (let c = 0; c < cols; c++)
+      g[r][c] = { alive: true, isCore: r === coreR && c === coreC };
+  }
+  return g;
+}
+
+// ── Player ───────────────────────────────────────────────────────────────────
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  tipOffset: 18,
+  angle: 0, cooldown: 0, muzzle: 0,
+  orbitAngle: 0,
+  exp: 0,
+  goldDisplay: 0,   // visually displayed value (animates toward exp)
+  goldPop: 0,       // pop scale timer (0=idle, >0=bouncing)
+  slashCooldown: 0,
+  chargeTime: 0,
+  rightHeld: false,
+  dodgeCooldown: 0,
+  dodgeTimer: 0,
+  guarding: false,
+  collectFlash: 0,
+};
+let inventoryOpen = false;
+let invOpenTime   = 0;
+let invClosing    = false;
+let invCloseTime  = 0;
+const INV_ANIM_DUR = 0.20;
+let invDirty = false;
+const INV_DOM = document.getElementById('inv');
+function openInventory() {
+  inventoryOpen = true; invClosing = false; invOpenTime = performance.now();
+  INV_DOM.classList.add('open');
+  invDirty = true;
+}
+function closeInventory() {
+  if (!inventoryOpen) return;
+  invClosing = true; invCloseTime = performance.now();
+  INV_DOM.classList.remove('open');
+  setTimeout(() => { inventoryOpen = false; invClosing = false; }, 260);
+}
+
+// ── Core inventory state ──────────────────────────────────────────────────────
+let equippedFrame   = createStarterFrame(); // null = starter
+const frameInventory = [];   // collected unequipped frames
+const equippedCores = new Array(4).fill(null);
+const coreInventory = [];
+const equipStats   = { bulletBonus: 0, speedMult: 1.0, slashMult: 1.0, extraOrbits: 0, orbitSpeedMult: 1.0 };
+let invHitRects     = [];       // populated each draw frame, used for mouse click
+let invCorePanelRect = null;   // bounds of the core inventory panel, updated each draw
+let pendingSlot      = -1;     // slot index awaiting core selection (-1 = none)
+let pendingFrameSlot = false;  // frame slot awaiting frame selection
+let invSection      = 'slots'; // 'slots' | 'frames' | 'cores'
+let invFrameCursor  = 0;       // フレームリスト内カーソル
+let invLeftCursor   = 0;       // コアリスト内カーソル
+let invRightCursor  = 0;       // 装備スロット内カーソル（-1=フレームスロット）
+let invCPerRowFrames = 2;      // draw時に更新
+let invCPerRowCores  = 4;      // draw時に更新
+
+// ── Pools ────────────────────────────────────────────────────────────────────
+const drops        = [];   // world core / frame pickups
+const pickupLog    = [];   // { label, rarityColor, life } — bottom-right fade log
+const bullets      = [];
+const enemies      = [];
+const shards       = [];
+const sparks       = [];
+const debris       = [];   // static ground remnants from destroyed enemy cells
+const coreTrails   = [];   // core afterimage trail entries
+const orbs         = [];
+const goldBursts   = [];   // gold shard burst on orb pickup
+const slashes      = [];
+const playerTrail  = [];
+
+// ── Glow helpers ──────────────────────────────────────────────────────────────
+function glow(col, blur)  { ctx.shadowColor = col; ctx.shadowBlur = blur; }
+function noGlow()         { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; }
+
+// ── Gamepad rumble ────────────────────────────────────────────────────────────
+function rumble(strong, weak, duration) {
+  const allP = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+  // mainPadIndex 優先、なければ接続されている最初のパッドを使う
+  const candidates = allP.filter(p => p?.connected);
+  const pad = (gp.mainPadIndex >= 0 ? allP[gp.mainPadIndex] : null) ?? candidates[0];
+  if (!pad?.vibrationActuator) return;
+  const act = pad.vibrationActuator;
+  const params = { startDelay: 0, duration, strongMagnitude: strong, weakMagnitude: weak };
+  // dual-rumble (Chrome標準) → 失敗したら trigger-rumble (一部PS系) を試みる
+  act.playEffect('dual-rumble', params).catch(() => {
+    act.playEffect('trigger-rumble', params).catch(() => {});
+  });
+}
+
+// ── Enemy spawn ───────────────────────────────────────────────────────────────
+function spawnEnemy() {
+  const n = SIZES[Math.floor(Math.random() * SIZES.length)];
+  let ex, ey, placed = false;
+
+  if (dungeon.length) {
+    // Collect all walkable floor tiles that are far enough from player and other enemies
+    const minDistSq = 200 * 200;
+    const candidates = [];
+    for (let ty = 1; ty < DH - 1; ty++) {
+      for (let tx = 1; tx < DW - 1; tx++) {
+        if (dungeon[ty][tx] !== 0) continue; // walls only on floor tiles
+        const wx = DOX + (tx + 0.5) * TILE;
+        const wy = DOY + (ty + 0.5) * TILE;
+        const distSq = (wx - player.x) ** 2 + (wy - player.y) ** 2;
+        if (distSq < minDistSq) continue;
+        candidates.push([wx, wy]);
+      }
+    }
+    // Shuffle and pick first that doesn't overlap existing enemies
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    for (const [cx, cy] of candidates) {
+      if (!enemies.some(e => e.alive && Math.hypot(cx - e.x, cy - e.y) < n * BLOCK + 20)) {
+        ex = cx; ey = cy; placed = true; break;
+      }
+    }
+  }
+
+  if (!placed) {
+    // Fallback for open stage (no dungeon): angle-based from player
+    const sxMin = DOX + TILE * 2, sxMax = DOX + (DW - 2) * TILE;
+    const syMin = DOY + TILE * 2, syMax = DOY + (DH - 2) * TILE;
+    const a = Math.random() * Math.PI * 2;
+    ex = Math.max(sxMin, Math.min(sxMax, player.x + Math.cos(a) * (240 + Math.random() * 180)));
+    ey = Math.max(syMin, Math.min(syMax, player.y + Math.sin(a) * (240 + Math.random() * 180)));
+  }
+
+  enemies.push({ x: ex, y: ey, vx: 0, vy: 0, cols: n, rows: n,
+    grid: makeGrid(n, n), angle: 0, hitFlash: 0, coreFlash: 0,
+    blinkT: Math.random() * Math.PI * 2, alive: true,
+    alpha: 0, repairTimer: 360,
+    coreMoveTimer: 480 + Math.floor(Math.random() * 240) });
+}
+
+// ── Slash actions ─────────────────────────────────────────────────────────────
+function doSlash() {
+  if (player.slashCooldown > 0) return;
+
+  // Scale arc, dash, and radius based on charge fraction
+  const frac = Math.min(player.chargeTime / (MAX_CHARGE - 1), 1);
+  const arcHalf = 0.7  + frac * 0.9;   // arc half-angle 0.7→1.6 rad
+  const dashSpd  = 7   + frac * 9;     // forward impulse 7→16 px
+  const radius   = (55 + frac * 50) * equipStats.slashMult;  // hit radius scaled by slash cores
+
+  player.slashCooldown = Math.round(10 + frac * 14);
+
+  player.vx += Math.cos(player.angle) * dashSpd;
+  player.vy += Math.sin(player.angle) * dashSpd;
+  shake = Math.max(shake, 4 + frac * 9);
+
+  const arcCenter = player.angle;
+  const arcFrom   = arcCenter - arcHalf;
+  const arcTo     = arcCenter + arcHalf;
+  const hitStyle  = frac < 0.4 ? 0 : frac < 0.75 ? 1 : 2;
+
+  // Offset slash origin forward so the player doesn't outrun it on dash
+  const fwdOff = 22 + frac * 20;
+  const slashX = player.x + Math.cos(player.angle) * fwdOff;
+  const slashY = player.y + Math.sin(player.angle) * fwdOff;
+
+  slashes.push({
+    x: slashX, y: slashY,
+    arcFrom, arcTo,
+    r: radius,
+    hit: hitStyle,
+    life: 1,
+    decay: 0.07 - frac * 0.02,
+  });
+
+  // Hit arc sector + unconditional melee circle at player origin
+  const fullRadius = fwdOff + radius;
+  const meleeR = 26;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const gw = e.cols * BLOCK, gh = e.rows * BLOCK;
+    const wcos = Math.cos(e.angle), wsin = Math.sin(e.angle);
+    for (let r = 0; r < e.rows; r++) {
+      for (let c = 0; c < e.cols; c++) {
+        if (!e.grid[r][c].alive) continue;
+        const ox = -gw/2, oy = -gh/2;
+        const lcx = ox + c*BLOCK + CELL/2, lcy = oy + r*BLOCK + CELL/2;
+        const wx = e.x + wcos*lcx - wsin*lcy;
+        const wy = e.y + wsin*lcx + wcos*lcy;
+        const dx = wx - player.x, dy = wy - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= meleeR) { chipEnemy(e, wx, wy); continue; }
+        if (dist > fullRadius) continue;
+        let diff = Math.atan2(dy, dx) - arcCenter;
+        while (diff >  Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        if (Math.abs(diff) <= arcHalf) chipEnemy(e, wx, wy);
+      }
+    }
+  }
+
+  slashWalls(player.x, player.y, arcCenter, arcHalf, fullRadius);
+
+  const steps = 8 + Math.round(frac * 6);
+  for (let i = 0; i <= steps; i++) {
+    const a = arcFrom + (arcTo - arcFrom) * (i / steps);
+    const d = radius * (0.5 + Math.random() * 0.5);
+    sparks.push({
+      x: slashX + Math.cos(a) * d, y: slashY + Math.sin(a) * d,
+      vx: Math.cos(a) * (1 + Math.random() * 3), vy: Math.sin(a) * (1 + Math.random() * 3),
+      life: 1, decay: 0.05 + Math.random() * 0.05,
+      r: 1.8 + frac * 0.7, isCore: false,
+    });
+  }
+}
+
+function doSpinSlash() {
+  if (player.slashCooldown > 0) return;
+  player.slashCooldown = 40;
+  shake = Math.max(shake, 14);
+
+  const R = Math.round(110 * equipStats.slashMult);
+
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const gw = e.cols * BLOCK, gh = e.rows * BLOCK;
+    const wcos = Math.cos(e.angle), wsin = Math.sin(e.angle);
+    for (let r = 0; r < e.rows; r++) {
+      for (let c = 0; c < e.cols; c++) {
+        if (!e.grid[r][c].alive) continue;
+        const ox = -gw/2, oy = -gh/2;
+        const lcx = ox + c*BLOCK + CELL/2, lcy = oy + r*BLOCK + CELL/2;
+        const wx = e.x + wcos*lcx - wsin*lcy;
+        const wy = e.y + wsin*lcx + wcos*lcy;
+        if (Math.hypot(wx - player.x, wy - player.y) <= R) {
+          chipEnemy(e, wx, wy);
+          // Extra outward knockback from player center
+          const sd = Math.hypot(e.x - player.x, e.y - player.y) || 1;
+          e.vx += ((e.x - player.x) / sd) * 1.5;
+          e.vy += ((e.y - player.y) / sd) * 1.5;
+        }
+      }
+    }
+  }
+
+  slashWalls(player.x, player.y, 0, Math.PI, R);
+
+  const steps = 24;
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const d = R * (0.5 + Math.random() * 0.5);
+    sparks.push({
+      x: player.x + Math.cos(a) * d,
+      y: player.y + Math.sin(a) * d,
+      vx: Math.cos(a) * (2 + Math.random() * 4),
+      vy: Math.sin(a) * (2 + Math.random() * 4),
+      life: 1, decay: 0.025 + Math.random() * 0.025,
+      r: 2.5, isCore: false,
+    });
+  }
+
+  slashes.push({
+    x: player.x, y: player.y,
+    arcFrom: 0, arcTo: Math.PI * 2,
+    r: R, hit: 'spin',
+    life: 1, decay: 0.035,
+    spinAngle: player.angle,
+  });
+}
+
+// ── Dodge ────────────────────────────────────────────────────────────────────
+function doDodge() {
+  if (player.dodgeCooldown > 0) return;
+  const spd = Math.hypot(player.vx, player.vy);
+  const dx = spd > 0.5 ? player.vx / spd : Math.cos(player.angle);
+  const dy = spd > 0.5 ? player.vy / spd : Math.sin(player.angle);
+  player.vx += dx * 22;
+  player.vy += dy * 22;
+  player.dodgeCooldown = 45;
+  player.dodgeTimer = 16;
+  shake = Math.max(shake, 3);
+  for (let i = 0; i < 8; i++) {
+    const a = Math.atan2(-dy, -dx) + (Math.random() - 0.5) * 1.2;
+    sparks.push({ x: player.x, y: player.y,
+      vx: Math.cos(a) * (2 + Math.random() * 4), vy: Math.sin(a) * (2 + Math.random() * 4),
+      life: 1, decay: 0.06 + Math.random() * 0.05, r: 1.5, isCore: false });
+  }
+}
+
+// ── Orb spawn ────────────────────────────────────────────────────────────────
+function spawnOrb(x, y, count = 1) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const spd = 1.5 + Math.random() * 3;
+    const roll  = Math.random();
+    const value = roll < 0.65 ? 1 : roll < 0.90 ? 5 : 10;
+    const r     = value === 1 ? 3.5 : value === 5 ? 5.5 : 8.5;
+    orbs.push({
+      x, y,
+      vx: Math.cos(a) * spd,
+      vy: Math.sin(a) * spd,
+      r, value,
+      phase: Math.random() * Math.PI * 2,
+      timer: 180,
+    });
+  }
+}
+
+function spawnGoldBurst(x, y, value) {
+  const count = value === 1 ? 7 : value === 5 ? 14 : 22;
+  const spdMax = value === 1 ? 2.8 : value === 5 ? 4.2 : 6.0;
+  const szMax  = value === 1 ? 2.2 : value === 5 ? 3.2 : 4.5;
+  for (let i = 0; i < count; i++) {
+    const a   = Math.random() * Math.PI * 2;
+    const spd = 0.8 + Math.random() * spdMax;
+    goldBursts.push({
+      x, y,
+      vx: Math.cos(a) * spd,
+      vy: Math.sin(a) * spd,
+      rot:  Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.55,
+      size: 1.0 + Math.random() * szMax,
+      life: 1.0,
+      decay: 0.035 + Math.random() * 0.045,
+    });
+  }
+}
+
+// ── Core helpers ─────────────────────────────────────────────────────────────
+function rollStatValue(type, rarityIdx) {
+  const t = Math.random();
+  if (type === 'bullet') {
+    const bases = [1, 1, 2, 3], maxes = [1, 2, 3, 5];
+    return Math.max(1, Math.round(bases[rarityIdx] + t * (maxes[rarityIdx] - bases[rarityIdx])));
+  }
+  if (type === 'speed') {
+    const bases = [0.10, 0.18, 0.25, 0.35], maxes = [0.20, 0.32, 0.45, 0.62];
+    return Math.round((bases[rarityIdx] + t * (maxes[rarityIdx] - bases[rarityIdx])) * 100) / 100;
+  }
+  if (type === 'slash') {
+    const bases = [0.08, 0.14, 0.20, 0.28], maxes = [0.18, 0.28, 0.40, 0.55];
+    return Math.round((bases[rarityIdx] + t * (maxes[rarityIdx] - bases[rarityIdx])) * 100) / 100;
+  }
+  if (type === 'orbit') {
+    const bases = [1, 1, 2, 2], maxes = [1, 2, 3, 4];
+    return Math.max(1, Math.round(bases[rarityIdx] + t * (maxes[rarityIdx] - bases[rarityIdx])));
+  }
+  if (type === 'orbitspeed') {
+    const bases = [0.10, 0.20, 0.30, 0.45], maxes = [0.20, 0.35, 0.55, 0.80];
+    return Math.round((bases[rarityIdx] + t * (maxes[rarityIdx] - bases[rarityIdx])) * 100) / 100;
+  }
+  return 1;
+}
+
+function rollBonusValue(type) {
+  const t = Math.random();
+  if (type === 'bullet')     return 1;
+  if (type === 'speed')      return Math.round((0.04 + t * 0.12) * 100) / 100;
+  if (type === 'slash')      return Math.round((0.03 + t * 0.10) * 100) / 100;
+  if (type === 'orbit')      return 1;
+  if (type === 'orbitspeed') return Math.round((0.05 + t * 0.15) * 100) / 100;
+  return 0;
+}
+
+function coreEffStr(type, value) {
+  if (type === 'bullet')     return `+${Math.round(value)} SHOT`;
+  if (type === 'speed')      return `+${Math.round(value * 100)}% SPD`;
+  if (type === 'slash')      return `+${Math.round(value * 100)}% SLH`;
+  if (type === 'orbit')      return `+${Math.ceil(value)} ORB`;
+  if (type === 'orbitspeed') return `+${Math.round(value * 100)}% OSPD`;
+  return '—';
+}
+
+function rollCore() {
+  let roll = Math.random() * 100, acc = 0;
+  let rarity = RARITIES[0], rarityIdx = 0;
+  for (let i = 0; i < RARITIES.length; i++) {
+    acc += RARITIES[i].weight;
+    if (roll < acc) { rarity = RARITIES[i]; rarityIdx = i; break; }
+  }
+  const def = CORE_DEFS[Math.floor(Math.random() * CORE_DEFS.length)];
+  const value = rollStatValue(def.type, rarityIdx);
+
+  // bonus affixes: 0 for common, 0-1 for rare, 1-2 for epic, 2-3 for legendary
+  const bonusCounts = [0, 1, 2, 3];
+  const bonusMin    = [0, 0, 1, 2];
+  const nBonuses = bonusMin[rarityIdx] + Math.floor(Math.random() * (bonusCounts[rarityIdx] - bonusMin[rarityIdx] + 1));
+  const otherDefs = CORE_DEFS.filter(d => d.type !== def.type);
+  const bonuses = [];
+  const usedTypes = new Set();
+  for (let i = 0; i < nBonuses && otherDefs.length > 0; i++) {
+    const available = otherDefs.filter(d => !usedTypes.has(d.type));
+    if (!available.length) break;
+    const bd = available[Math.floor(Math.random() * available.length)];
+    usedTypes.add(bd.type);
+    bonuses.push({ type: bd.type, label: bd.label, value: rollBonusValue(bd.type) });
+  }
+
+  return { ...def, rarity, value, bonuses };
+}
+
+function applyCoreStat(type, value) {
+  if (type === 'bullet')     equipStats.bulletBonus  += Math.round(value);
+  if (type === 'speed')      equipStats.speedMult    += value;
+  if (type === 'slash')      equipStats.slashMult    += value;
+  if (type === 'orbit')      equipStats.extraOrbits  += Math.ceil(value);
+  if (type === 'orbitspeed') equipStats.orbitSpeedMult += value;
+}
+
+function recalcEquip() {
+  equipStats.bulletBonus   = 0;
+  equipStats.speedMult     = 1.0;
+  equipStats.slashMult     = 1.0;
+  equipStats.extraOrbits   = 0;
+  equipStats.orbitSpeedMult = 1.0;
+  for (let si = 0; si < equippedCores.length; si++) {
+    const c = equippedCores[si];
+    if (!c) continue;
+    const slotMult = equippedFrame.slotMults?.[si] ?? 1.0;
+    applyCoreStat(c.type, (c.value ?? c.rarity.mult) * slotMult);
+    for (const b of (c.bonuses ?? [])) applyCoreStat(b.type, b.value * slotMult);
+  }
+}
+
+function resizeEquippedCores() {
+  const total = equippedFrame.cols * equippedFrame.rows;
+  // excess cores back to inventory
+  while (equippedCores.length > total) {
+    const c = equippedCores.pop();
+    if (c) delete c.equippedSlot;
+  }
+  while (equippedCores.length < total) equippedCores.push(null);
+  recalcEquip();
+}
+
+function dropCore(wx, wy) {
+  const core = rollCore();
+  const a = Math.random() * Math.PI * 2;
+  const spd = 1.5 + Math.random() * 2.5;
+  drops.push({
+    x: wx, y: wy,
+    vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+    phase: Math.random() * Math.PI * 2,
+    timer: 480,
+    kind: 'core',
+    data: core,
+  });
+}
+
+function dropFrame(wx, wy) {
+  let roll = Math.random() * 100, acc = 0;
+  let rarity = RARITIES[0];
+  for (const r of RARITIES) { acc += r.weight; if (roll < acc) { rarity = r; break; } }
+  const def = FRAME_DEFS[Math.floor(Math.random() * FRAME_DEFS.length)];
+  const slotCount = def.cols * def.rows;
+  const slotMults = Array.from({ length: slotCount }, () => Math.round((1.0 + Math.random()) * 10) / 10);
+  const a = Math.random() * Math.PI * 2;
+  const spd = 1.2 + Math.random() * 2;
+  drops.push({
+    x: wx, y: wy,
+    vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+    phase: Math.random() * Math.PI * 2,
+    timer: 600,
+    kind: 'frame',
+    data: { ...def, rarity, slotMults },
+  });
+}
+
+// ── Shooting ──────────────────────────────────────────────────────────────────
+function fireBullet(a) {
+  const tip = player.tipOffset;
+  bullets.push({
+    x: player.x + Math.cos(a) * tip,
+    y: player.y + Math.sin(a) * tip,
+    vx: Math.cos(a) * 18, vy: Math.sin(a) * 18,
+    prev: null,
+  });
+}
+
+function tryShoot() {
+  if (player.cooldown > 0) return;
+  const a = Math.atan2(mouse.y - H/2, mouse.x - W/2);
+  if (activeSkills.has(4)) {
+    fireBullet(a - 0.44); fireBullet(a - 0.22); fireBullet(a);
+    fireBullet(a + 0.22); fireBullet(a + 0.44);
+  } else if (activeSkills.has(1)) {
+    fireBullet(a - 0.22); fireBullet(a); fireBullet(a + 0.22);
+  } else {
+    fireBullet(a);
+  }
+  for (let bi = 1; bi <= equipStats.bulletBonus; bi++) {
+    fireBullet(a + 0.18 * bi);
+    fireBullet(a - 0.18 * bi);
+  }
+  const cd = activeSkills.has(3) ? (activeSkills.has(4) ? 6 : 3) : activeSkills.has(4) ? 13 : 9;
+  player.cooldown = cd;
+  player.muzzle = 7;
+  shake = Math.max(shake, 3.5);
+  for (let i = 0; i < 5; i++) {
+    const sa = a + (Math.random() - 0.5) * 0.5;
+    sparks.push({
+      x: player.x + Math.cos(a) * player.tipOffset,
+      y: player.y + Math.sin(a) * player.tipOffset,
+      vx: Math.cos(sa) * (5 + Math.random() * 5),
+      vy: Math.sin(sa) * (5 + Math.random() * 5),
+      life: 1, decay: 0.15, r: 2, isCore: false,
+    });
+  }
+}
+
+// ── Enemy hit logic ───────────────────────────────────────────────────────────
+function chipEnemy(e, bx, by) {
+  const gw = e.cols * BLOCK, gh = e.rows * BLOCK;
+  const ldx = bx - e.x, ldy = by - e.y;
+  const cos = Math.cos(-e.angle), sin = Math.sin(-e.angle);
+  const lx = cos*ldx - sin*ldy, ly = sin*ldx + cos*ldy;
+  const ox = -gw/2, oy = -gh/2;
+  const fc = Math.round((lx - ox) / BLOCK - 0.5);
+  const fr = Math.round((ly - oy) / BLOCK - 0.5);
+
+  let best = null, bestD = Infinity;
+  for (let dr = -2; dr <= 2; dr++) {
+    for (let dc = -2; dc <= 2; dc++) {
+      const r = fr+dr, c = fc+dc;
+      if (r < 0 || r >= e.rows || c < 0 || c >= e.cols) continue;
+      if (!e.grid[r][c].alive) continue;
+      const cx = ox + c*BLOCK + CELL/2, cy = oy + r*BLOCK + CELL/2;
+      const d = (lx-cx)**2 + (ly-cy)**2;
+      if (d < bestD) { bestD = d; best = { r, c, cx, cy }; }
+    }
+  }
+  if (!best) return false;
+
+  const cell = e.grid[best.r][best.c];
+  cell.alive = false;
+  e.hitFlash = 6;
+  e.repairTimer = 360;
+
+  // Knockback: push enemy away from hit point
+  const kbDist = Math.hypot(e.x - bx, e.y - by) || 1;
+  const kbStr  = cell.isCore ? 2.0 : 0.9;
+  e.vx += ((e.x - bx) / kbDist) * kbStr;
+  e.vy += ((e.y - by) / kbDist) * kbStr;
+
+  const wcos = Math.cos(e.angle), wsin = Math.sin(e.angle);
+  const wx = e.x + wcos*best.cx - wsin*best.cy;
+  const wy = e.y + wsin*best.cx + wcos*best.cy;
+
+  const hitAngle = Math.atan2(wy - by, wx - bx);
+  const shardCount = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < shardCount; i++) {
+    const a = hitAngle + (Math.random() - 0.5) * 1.6;
+    const spd = 6 + Math.random() * 10;
+    const sz  = CELL * (0.5 + Math.random() * 0.8);
+    shards.push({ x: wx, y: wy,
+      vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.35,
+      life: 1, decay: 0.022 + Math.random() * 0.018,
+      isCore: cell.isCore, size: sz, fromEnemy: true });
+  }
+
+  for (let i = 0; i < 14; i++) {
+    const sa = i < 9
+      ? hitAngle + (Math.random() - 0.5) * 2.0   // forward fan
+      : Math.random() * Math.PI * 2;               // ambient scatter
+    const spd = i < 9 ? 4 + Math.random() * 9 : 1 + Math.random() * 3;
+    sparks.push({ x: wx, y: wy,
+      vx: Math.cos(sa) * spd, vy: Math.sin(sa) * spd,
+      life: 1, decay: 0.04 + Math.random() * 0.05,
+      r: i < 9 ? 2.5 : 1.2, isCore: cell.isCore });
+  }
+
+  shake = Math.max(shake, cell.isCore ? 12 : 6);
+
+  if (cell.isCore) {
+    spawnOrb(wx, wy, 6 + Math.floor(Math.random() * 5));
+    e.coreFlash = 15;
+    hitStop = 5;
+    blastWalls(wx, wy, 90);
+    blastNearbyEnemies(wx, wy, 150);
+    setTimeout(() => killEnemy(e), 80);
+    rumble(0.35, 0.6, 180);
+    dropCore(wx, wy);
+    if (Math.random() < 0.25) dropFrame(wx, wy);
+    return 'core';
+  } else {
+    spawnOrb(wx, wy, 1);
+    rumble(0, 0.3, 55);       // 通常ヒット: 振動細
+  }
+
+  return true;
+}
+
+function slashWalls(originX, originY, arcCenter, arcHalf, radius) {
+  const txMin = Math.floor((originX - radius - DOX) / TILE);
+  const txMax = Math.floor((originX + radius - DOX) / TILE);
+  const tyMin = Math.floor((originY - radius - DOY) / TILE);
+  const tyMax = Math.floor((originY + radius - DOY) / TILE);
+  for (let ty = tyMin; ty <= tyMax; ty++) {
+    for (let tx = txMin; tx <= txMax; tx++) {
+      if (tx < 0 || tx >= DW || ty < 0 || ty >= DH) continue;
+      if (dungeon[ty][tx] <= 0 || dungeon[ty][tx] >= 999) continue;
+      const twx = DOX + (tx + 0.5) * TILE, twy = DOY + (ty + 0.5) * TILE;
+      if (Math.hypot(twx - originX, twy - originY) > radius) continue;
+      const ang = Math.atan2(twy - originY, twx - originX);
+      if (arcHalf < Math.PI) {
+        let diff = ang - arcCenter;
+        while (diff >  Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        if (Math.abs(diff) > arcHalf) continue;
+      }
+      damageWall(tx, ty, twx, twy, ang);
+    }
+  }
+}
+
+function blastNearbyEnemies(cx, cy, radius) {
+  for (const target of enemies) {
+    if (!target.alive) continue;
+    const gw = target.cols * BLOCK, gh = target.rows * BLOCK;
+    const enemyDist = Math.hypot(target.x - cx, target.y - cy);
+    if (enemyDist > radius + Math.max(gw, gh)) continue;
+    // Effective damage radius shrinks with distance: close enemies take full blast,
+    // far enemies only lose outer cells (core stays safe unless very close)
+    const hitR = radius * Math.max(0, 1 - enemyDist / radius * 0.85);
+    if (hitR <= 0) continue;
+    const cos = Math.cos(target.angle), sin = Math.sin(target.angle);
+    const kd = enemyDist || 1;
+    let anyHit = false;
+    for (let r = 0; r < target.rows; r++) {
+      for (let c = 0; c < target.cols; c++) {
+        const cell = target.grid[r][c];
+        if (!cell.alive) continue;
+        const lx = -gw/2 + c*BLOCK + CELL/2;
+        const ly = -gh/2 + r*BLOCK + CELL/2;
+        const wx = target.x + cos*lx - sin*ly;
+        const wy = target.y + sin*lx + cos*ly;
+        if (Math.hypot(wx - cx, wy - cy) > hitR) continue;
+        cell.alive = false;
+        anyHit = true;
+        target.repairTimer = 360;
+        const ha = Math.atan2(wy - cy, wx - cx);
+        for (let i = 0; i < 4; i++) {
+          const a = ha + (Math.random() - 0.5) * Math.PI;
+          sparks.push({ x: wx, y: wy,
+            vx: Math.cos(a)*(3+Math.random()*7), vy: Math.sin(a)*(3+Math.random()*7),
+            life: 1, decay: 0.05+Math.random()*0.04, r: 1.5, isCore: cell.isCore });
+        }
+        shards.push({ x: wx, y: wy,
+          vx: Math.cos(Math.atan2(wy-cy,wx-cx))*(4+Math.random()*6),
+          vy: Math.sin(Math.atan2(wy-cy,wx-cx))*(4+Math.random()*6),
+          rot: Math.random()*Math.PI*2, rotV: (Math.random()-0.5)*0.3,
+          life: 1, decay: 0.025+Math.random()*0.02, isCore: cell.isCore,
+          size: CELL*(0.4+Math.random()*0.6), fromEnemy: true });
+        if (cell.isCore) {
+          spawnOrb(wx, wy, 6 + Math.floor(Math.random() * 5));
+          target.coreFlash = 15;
+          blastWalls(wx, wy, 70);
+          dropCore(wx, wy);
+          if (Math.random() < 0.25) dropFrame(wx, wy);
+          setTimeout(() => killEnemy(target), 80);
+        }
+      }
+    }
+    if (anyHit) {
+      target.hitFlash = 6;
+      target.vx += ((target.x - cx) / kd) * 1.8;
+      target.vy += ((target.y - cy) / kd) * 1.8;
+    }
+  }
+}
+
+function blastWalls(cx, cy, radius) {
+  const txMin = Math.floor((cx - radius - DOX) / TILE);
+  const txMax = Math.floor((cx + radius - DOX) / TILE);
+  const tyMin = Math.floor((cy - radius - DOY) / TILE);
+  const tyMax = Math.floor((cy + radius - DOY) / TILE);
+  for (let ty = tyMin; ty <= tyMax; ty++) {
+    for (let tx = txMin; tx <= txMax; tx++) {
+      if (tx < 0 || tx >= DW || ty < 0 || ty >= DH) continue;
+      if (dungeon[ty][tx] <= 0 || dungeon[ty][tx] >= 999) continue;
+      const twx = DOX + (tx + 0.5) * TILE, twy = DOY + (ty + 0.5) * TILE;
+      const dist = Math.hypot(twx - cx, twy - cy);
+      if (dist > radius) continue;
+      const hitA = Math.atan2(twy - cy, twx - cx);
+      dungeon[ty][tx] = 0;
+      const frac = 1 - dist / radius;
+      for (let i = 0; i < 3; i++) {
+        const a = hitA + (Math.random() - 0.5) * 2.2;
+        const spd = (4 + Math.random() * 9) * (0.6 + frac * 0.8);
+        shards.push({ x: twx, y: twy, vx: Math.cos(a)*spd, vy: Math.sin(a)*spd,
+          rot: Math.random()*Math.PI*2, rotV: (Math.random()-0.5)*0.3,
+          life: 1, decay: 0.018 + Math.random()*0.014, isCore: false,
+          size: 5 + Math.random() * 9 });
+      }
+      for (let i = 0; i < 3; i++) {
+        const a = hitA + (Math.random() - 0.5) * 2.0;
+        sparks.push({ x: twx, y: twy,
+          vx: Math.cos(a)*(3+Math.random()*6), vy: Math.sin(a)*(3+Math.random()*6),
+          life: 1, decay: 0.04+Math.random()*0.04, r: 1.5, isCore: false });
+      }
+    }
+  }
+}
+
+function killEnemy(e) {
+  if (!e.alive) return;
+  e.alive = false;
+  shake = Math.max(shake, 14);
+  setTimeout(spawnEnemy, 1800 + Math.random() * 1200);
+  const gw = e.cols * BLOCK, gh = e.rows * BLOCK;
+  for (let r = 0; r < e.rows; r++) {
+    for (let c = 0; c < e.cols; c++) {
+      if (!e.grid[r][c].alive) continue;
+      const ox = -gw/2, oy = -gh/2;
+      const lcx = ox + c*BLOCK + CELL/2, lcy = oy + r*BLOCK + CELL/2;
+      const wcos = Math.cos(e.angle), wsin = Math.sin(e.angle);
+      const wx = e.x + wcos*lcx - wsin*lcy, wy = e.y + wsin*lcx + wcos*lcy;
+      const a = Math.atan2(lcy, lcx) + (Math.random()-0.5)*0.8;
+      const s = 5 + Math.random() * 10;
+      shards.push({ x: wx, y: wy, vx: Math.cos(a)*s, vy: Math.sin(a)*s,
+        rot: Math.random()*Math.PI*2, rotV: (Math.random()-0.5)*0.25,
+        life: 1, decay: 0.01+Math.random()*0.02, isCore: e.grid[r][c].isCore, size: CELL, fromEnemy: true });
+    }
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+generateDungeon();
+for (let i = 0; i < 6; i++) spawnEnemy();
+
+</script>
+<script>
+// ════════════════════════════════════════════════════════════
+//  INVENTORY DOM RENDERER
+// ════════════════════════════════════════════════════════════
+function renderInvDOM() {
+  // ── Stats ──────────────────────────────────────────────────
+  const stDefs = [
+    { label:'BULLET', icon:'target',  color:'#dddddd', val:equipStats.bulletBonus,      max:6,   txt:equipStats.bulletBonus>0?`+${equipStats.bulletBonus}`:'—' },
+    { label:'SPEED',  icon:'sprint',  color:'#cfcfcf', val:equipStats.speedMult-1,      max:1.5, txt:equipStats.speedMult>1?`+${Math.round((equipStats.speedMult-1)*100)}%`:'—' },
+    { label:'SLASH',  icon:'swords',  color:'#dddddd', val:equipStats.slashMult-1,      max:1.5, txt:equipStats.slashMult>1?`+${Math.round((equipStats.slashMult-1)*100)}%`:'—' },
+    { label:'ORBITS', icon:'orbit',   color:'#dddddd', val:equipStats.extraOrbits,      max:4,   txt:equipStats.extraOrbits>0?`+${equipStats.extraOrbits}`:'—' },
+    { label:'OSPD',   icon:'bolt',    color:'#cdcdcd', val:equipStats.orbitSpeedMult-1, max:1.5, txt:equipStats.orbitSpeedMult>1?`+${Math.round((equipStats.orbitSpeedMult-1)*100)}%`:'—' },
+  ];
+  document.getElementById('iv-stats').innerHTML = stDefs.map(st => {
+    const on = st.val > 0;
+    const f  = st.max > 0 ? Math.min(1, st.val / st.max) : 0;
+    return `<div class="iv-stat-row">
+      <span class="iv-stat-icon${on?' on':''}" style="${on?`color:${st.color}`:''}">
+        ${st.icon}
+      </span>
+      <span class="iv-stat-lbl">${st.label}</span>
+      <span class="iv-stat-val" style="${on?`color:${st.color}`:''}">
+        ${st.txt}
+      </span>
+      <div class="iv-stat-bar">
+        <div class="iv-stat-fill" style="width:${f*100}%;background:${on?st.color:'rgba(255,255,255,.04)'}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Loadout ─────────────────────────────────────────────────
+  const ef = equippedFrame;
+  const fc = ef.cols, fr = ef.rows;
+  const hasRar = !!ef.rarity;
+  const rc  = hasRar ? ef.rarity.color : '#949494';
+  const isFSel  = invSection === 'slots' && invRightCursor === -1;
+  const isFPend = pendingFrameSlot;
+
+  const fSlot = `<div class="iv-frame-slot${isFSel?' sel':''}${isFPend?' pend':''}" data-a="frame-slot">
+    <span class="iv-fs-icon" style="color:${hasRar?rc:'#cccccc'}">grid_view</span>
+    <div class="iv-fs-name">${ef.label}</div>
+    <div class="iv-fs-rar" style="color:${rc}">${hasRar?ef.rarity.label:'STARTER'}</div>
+  </div>`;
+
+  const cGrid = `<div class="iv-cores-grid" style="grid-template-columns:repeat(${fc},1fr)">
+    ${Array.from({length:fc*fr},(_,si)=>{
+      const core=equippedCores[si];
+      const sel=invSection==='slots'&&invRightCursor===si;
+      const pend=pendingSlot===si;
+      const sm=ef.slotMults?.[si]??1.0;
+      const smC=sm>1?`rgb(${Math.round(40+(sm-1)*80)},${Math.round(80+(sm-1)*140)},70)`:'#bbbbbb';
+      if(core){
+        const sym=CORE_ICON[core.type]??'star';
+        return `<div class="iv-core-slot${sel?' sel':''}${pend?' pend':''}" data-a="slot" data-idx="${si}">
+          <span class="iv-core-icon" style="font-size:22px;color:${core.rarity.color}">${sym}</span>
+          <div class="iv-core-name" style="${sel?`color:#ffffff`:''}">${core.label}</div>
+          <div class="iv-slot-mult" style="color:${smC}">×${sm.toFixed(1)}</div>
+        </div>`;
+      }
+      return `<div class="iv-core-slot${sel?' sel':''}${pend?' pend':''}" data-a="slot" data-idx="${si}">
+        <div style="font:16px/1 Orbitron;color:${sel?'#ffffff':'#999999'}">+</div>
+        <div class="iv-slot-mult" style="color:${smC}">×${sm.toFixed(1)}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  document.getElementById('iv-loadout').innerHTML = fSlot + cGrid;
+
+  // ── Detail ──────────────────────────────────────────────────
+  let det = null;
+  if (invSection==='frames' && frameInventory[invFrameCursor])
+    det = { kind:'frame', data:frameInventory[invFrameCursor] };
+  else if (invSection==='cores' && coreInventory[invLeftCursor])
+    det = { kind:'core', data:coreInventory[invLeftCursor] };
+  else if (invSection==='slots' && equippedCores[invRightCursor])
+    det = { kind:'core', data:equippedCores[invRightCursor], eq:true };
+
+  const detEl = document.getElementById('iv-det-body');
+  if (!det) {
+    detEl.innerHTML = '<div class="iv-det-empty">— Select an Item —</div>';
+  } else if (det.kind==='frame') {
+    const f=det.data;
+    detEl.innerHTML = `
+      <div class="iv-det-icon" style="color:${f.rarity.color}">${FRAME_ICON}</div>
+      <div class="iv-det-name">${f.label}</div>
+      <div class="iv-det-rar" style="color:${f.rarity.color}">${f.rarity.label} FRAME</div>
+      <div class="iv-divider"></div>
+      ${[['SIZE',`${f.cols} × ${f.rows}`],['SLOTS',`${f.cols*f.rows}`]].map(([l,v])=>`
+        <div class="iv-det-meta">
+          <span class="iv-det-ml">${l}</span>
+          <span class="iv-det-mv" style="color:#a4a4a4">${v}</span>
+        </div>`).join('')}
+      ${f.slotMults?`
+        <div class="iv-det-sub" style="margin-top:10px">Slot Multipliers</div>
+        <div class="iv-mult-grid" style="grid-template-columns:repeat(${f.cols},1fr);margin-top:4px">
+          ${f.slotMults.map(m=>{const b=Math.min(1,m-1);return `<div class="iv-mult-cell" style="width:32px;height:32px;background:rgb(${Math.round(40+b*80)},${Math.round(80+b*140)},${Math.round(60+b*40)})">×${m.toFixed(1)}</div>`}).join('')}
+        </div>`:''}`;
+  } else {
+    const c=det.data;
+    const sym=CORE_ICON[c.type]??'star';
+    const cv=c.value??c.rarity.mult;
+    const ec=c.type==='bullet'?'#dddddd':c.type==='speed'?'#cfcfcf':c.type==='slash'?'#dddddd':c.type==='orbitspeed'?'#cdcdcd':'#dddddd';
+    const bns=c.bonuses??[];
+    detEl.innerHTML=`
+      <div class="iv-det-icon" style="color:${c.rarity.color}">${sym}</div>
+      <div class="iv-det-name">${c.label}</div>
+      <div class="iv-det-rar" style="color:${c.rarity.color}">${c.rarity.label}</div>
+      <div class="iv-divider"></div>
+      <div class="iv-det-eff" style="color:${ec}">${coreEffStr(c.type,cv)}</div>
+      ${bns.length?`<div class="iv-divider"></div><div class="iv-det-sub">Sub Options</div>
+        ${bns.map(b=>{const bc=b.type==='bullet'?'#dddddd':b.type==='speed'?'#cfcfcf':b.type==='slash'?'#dddddd':b.type==='orbitspeed'?'#cdcdcd':'#dddddd';
+          return `<div class="iv-det-bonus" style="border-left:2px solid ${bc}22">
+            <span class="iv-det-bi" style="color:${bc}">${CORE_ICON[b.type]??'star'}</span>
+            <span style="font:6px/1 Orbitron;color:rgba(181,181,181,.45)">${b.type.toUpperCase()}</span>
+            <span class="iv-det-bv" style="color:${bc}">${coreEffStr(b.type,b.value)}</span>
+          </div>`;}).join('')}`:''}
+      ${det.eq?'<div class="iv-det-eq">[ Equipped ]</div>':''}`;
+  }
+
+  // ── Frame grid ──────────────────────────────────────────────
+  const F_COLS=4, F_ROWS=5;
+  invCPerRowFrames = F_COLS;
+  document.getElementById('iv-fhd').className = 'iv-col-hd'+(invSection==='frames'?' on':'');
+  document.getElementById('iv-fhd').textContent = `FRAMES  ${frameInventory.filter(Boolean).length}/20`;
+
+  let fHTML='';
+  for(let ii=0;ii<F_COLS*F_ROWS;ii++){
+    const frame=frameInventory[ii];
+    const sel=invSection==='frames'&&invFrameCursor===ii&&!!frame;
+    if(!frame){ fHTML+=`<div class="iv-empty">${ii+1}</div>`; continue; }
+    const isEq=!!frame.isEquipped;
+    fHTML+=`<div class="iv-card${sel?' sel':''}${isEq&&!sel?' eq':''}" data-a="frame" data-idx="${ii}"
+      style="opacity:${pendingSlot>=0?0.65:1}">
+      <div class="iv-rar-bar" style="background:${frame.rarity.color}"></div>
+      <span class="iv-card-icon" style="color:${frame.rarity.color}">${FRAME_ICON}</span>
+      <div class="iv-card-name">${frame.label}</div>
+      <div class="iv-card-rar" style="color:${frame.rarity.color}">${frame.rarity.label}</div>
+      ${isEq?`<div class="iv-card-eq" style="color:#dddddd">EQ</div>`:''}
+    </div>`;
+  }
+  document.getElementById('iv-fgrid').innerHTML = fHTML;
+
+  // ── Core grid ──────────────────────────────────────────────
+  const C_COLS=4, C_ROWS=5;
+  invCPerRowCores = C_COLS;
+  document.getElementById('iv-chd').className = 'iv-col-hd'+(invSection==='cores'?' on':'');
+  document.getElementById('iv-chd').textContent = `CORES  ${coreInventory.filter(Boolean).length}/20`;
+
+  let cHTML='';
+  for(let ii=0;ii<C_COLS*C_ROWS;ii++){
+    const core=coreInventory[ii];
+    const sel=invSection==='cores'&&invLeftCursor===ii&&!!core;
+    if(!core){ cHTML+=`<div class="iv-empty" data-a="core-bg">✕</div>`; continue; }
+    const sym4=CORE_ICON[core.type]??'star';
+    const isEq=core.equippedSlot!==undefined;
+    const ec2=core.type==='bullet'?'#dddddd':core.type==='speed'?'#cfcfcf':core.type==='slash'?'#dddddd':core.type==='orbitspeed'?'#cdcdcd':'#dddddd';
+    cHTML+=`<div class="iv-card${sel?' sel':''}${isEq&&!sel?' eq':''}" data-a="core" data-idx="${ii}"
+      style="opacity:${pendingFrameSlot?0.65:1}">
+      <div class="iv-rar-bar" style="background:${core.rarity.color}"></div>
+      <span class="iv-card-icon" style="color:${core.rarity.color}">${sym4}</span>
+      <div class="iv-card-name">${core.label}</div>
+      <div class="iv-card-val" style="color:${'#eeeeee'}">${coreEffStr(core.type,core.value??core.rarity.mult)}</div>
+      <div class="iv-card-rar" style="color:${core.rarity.color}">${core.rarity.label}</div>
+      ${isEq?`<div class="iv-card-eq" style="color:#dddddd">S${core.equippedSlot+1}</div>`:''}
+    </div>`;
+  }
+  document.getElementById('iv-cgrid').innerHTML = cHTML;
+}
+
+// ── Inventory DOM click handler ──────────────────────────────
+INV_DOM.addEventListener('mousedown', e => {
+  if (!inventoryOpen) return;
+  e.stopPropagation();
+  const el = e.target.closest('[data-a]');
+  if (!el) return;
+  const a = el.dataset.a;
+  const idx = el.dataset.idx !== undefined ? +el.dataset.idx : undefined;
+
+  if (a === 'frame-slot') {
+    invRightCursor = -1; invSection = 'slots';
+    if (pendingFrameSlot) {
+      if (equippedFrame.rarity) {
+        equippedCores.forEach(c=>{if(c)delete c.equippedSlot;});
+        if (equippedFrame.isEquipped) delete equippedFrame.isEquipped;
+        equippedFrame=createStarterFrame();
+        equippedCores.length=0; resizeEquippedCores();
+      }
+      pendingFrameSlot = false;
+    } else {
+      pendingFrameSlot=true; pendingSlot=-1; invSection='frames';
+      if(invFrameCursor>=frameInventory.length) invFrameCursor=0;
+    }
+  } else if (a === 'slot') {
+    if (pendingFrameSlot) return;
+    invRightCursor = idx;
+    if (pendingSlot === idx) {
+      const sc=equippedCores[pendingSlot];
+      if(sc){delete sc.equippedSlot;equippedCores[pendingSlot]=null;recalcEquip();}
+      pendingSlot=-1; invSection='slots';
+    } else {
+      pendingSlot=idx; invSection='cores';
+      if(invLeftCursor>=coreInventory.length) invLeftCursor=0;
+    }
+  } else if (a === 'frame') {
+    const frame=frameInventory[idx];
+    invFrameCursor=idx; invSection='frames';
+    if (pendingFrameSlot && frame) {
+      equippedCores.forEach(c=>{if(c)delete c.equippedSlot;});
+      if(frame.isEquipped){
+        delete frame.isEquipped;
+        equippedFrame=createStarterFrame();
+      } else {
+        if(equippedFrame?.isEquipped) delete equippedFrame.isEquipped;
+        equippedFrame=frame; frame.isEquipped=true;
+      }
+      equippedCores.length=0; resizeEquippedCores();
+      pendingFrameSlot=false; invSection='slots'; invRightCursor=0;
+    }
+  } else if (a === 'core') {
+    if (pendingFrameSlot) return;
+    const core=coreInventory[idx];
+    if (!core) return;
+    const tgt=pendingSlot>=0?pendingSlot:invRightCursor;
+    if (tgt<0) return;
+    if (core.equippedSlot===tgt) {
+      delete core.equippedSlot; equippedCores[tgt]=null;
+    } else {
+      if(core.equippedSlot!==undefined) equippedCores[core.equippedSlot]=null;
+      if(equippedCores[tgt]) delete equippedCores[tgt].equippedSlot;
+      equippedCores[tgt]=core; core.equippedSlot=tgt;
+    }
+    recalcEquip(); invRightCursor=tgt; pendingSlot=-1; invLeftCursor=idx; invSection='slots';
+  } else if (a === 'core-bg') {
+    if (pendingSlot>=0) {
+      const bc=equippedCores[pendingSlot];
+      if(bc){delete bc.equippedSlot;equippedCores[pendingSlot]=null;recalcEquip();}
+      pendingSlot=-1; invSection='slots';
+    }
+  }
+  invDirty = true;
+  e.preventDefault();
+});
+
+</script>
+<script>
+// ── Update sub-functions ──────────────────────────────────────────────────────
+
+function updateInput(dt) {
+  const allP = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+
+  // Left stick: pick the pad with the most input; require >0.3 to set as main
+  {
+    let bestLx = 0, bestLy = 0;
+    for (const p of allP) {
+      if (!p || !p.connected) continue;
+      const { x: lx, y: ly } = radialDeadzone(p.axes[0], p.axes[1]);
+      const mag = Math.hypot(lx, ly);
+      if (mag > Math.hypot(bestLx, bestLy)) { bestLx = lx; bestLy = ly; }
+      if (mag > 0.3) gp.mainPadIndex = p.index;
+      // スティック未使用でもボタン入力があればメインパッドとして登録
+      if (gp.mainPadIndex < 0 && p.buttons.some(b => b.pressed)) gp.mainPadIndex = p.index;
+    }
+    if (Math.hypot(bestLx, bestLy) > 0) {
+      keys['_gpL'] = true;
+      player.vx = player.vx * Math.pow(0.75, dt) + bestLx * 3.8 * equipStats.speedMult * (1 - Math.pow(0.75, dt));
+      player.vy = player.vy * Math.pow(0.75, dt) + bestLy * 3.8 * equipStats.speedMult * (1 - Math.pow(0.75, dt));
+    } else {
+      keys['_gpL'] = false;
+    }
+  }
+
+  // Right stick: read only from the confirmed main pad (avoids drift from other pads)
+  {
+    const src = gp.mainPadIndex >= 0 ? allP[gp.mainPadIndex] : null;
+    if (src) {
+      const { x: rx, y: ry } = radialDeadzone(src.axes[2], src.axes[3]);
+      if (Math.hypot(rx, ry) > 0) {
+        const angle = Math.atan2(ry, rx);
+        player.angle = angle;
+        mouse.x = W / 2 + Math.cos(angle) * 160;
+        mouse.y = H / 2 + Math.sin(angle) * 160;
+        gp.aimActive = true;
+      } else {
+        gp.aimActive = false;
+      }
+    } else {
+      gp.aimActive = false;
+    }
+  }
+
+  // Buttons: scan every connected pad
+  {
+    const anyBtn = (idx) => allP.some(p => p && p.connected && gpBtn(p, idx));
+    const anyVal = (idx) => allP.reduce((m, p) => p && p.connected ? Math.max(m, gpVal(p, idx)) : m, 0);
+    const prev = gp.prev;
+
+    const r2 = anyVal(7) > 0.5;
+    if (r2 && !(prev['_r2'] ?? false)) tryShoot();
+    mouse.held = r2;
+    prev['_r2'] = r2;
+
+    const r1 = anyBtn(5);
+    if (r1 && !(prev['_r1'] ?? false)) player.rightHeld = true;
+    if (!r1 && (prev['_r1'] ?? false)) {
+      if (player.chargeTime >= MAX_CHARGE) doSpinSlash();
+      else doSlash();
+      player.chargeTime = 0;
+      player.rightHeld = false;
+    }
+    prev['_r1'] = r1;
+
+    const circle = anyBtn(1);
+    if (circle && !(prev['_b1'] ?? false)) {
+      if (inventoryOpen) {
+        if (pendingSlot >= 0) { pendingSlot = -1; invSection = 'slots'; }
+        else if (pendingFrameSlot) { pendingFrameSlot = false; invSection = 'slots'; invRightCursor = -1; }
+        else closeInventory();
+      } else doDodge();
+    }
+    prev['_b1'] = circle;
+
+    player.guarding = anyVal(6) > 0.5;
+
+    const sq = anyBtn(2);
+    prev['_sq'] = sq;
+
+    const tri = anyBtn(3);
+    if (tri && !(prev['_b3'] ?? false)) { if (inventoryOpen) closeInventory(); else if (!invClosing) openInventory(); }
+    prev['_b3'] = tri;
+
+    const cross = anyBtn(0);
+    if (cross && !(prev['_b0'] ?? false) && inventoryOpen) {
+      if (invSection === 'frames') {
+        const frame = frameInventory[invFrameCursor];
+        if (frame) {
+          equippedCores.forEach(c => { if (c) delete c.equippedSlot; });
+          if (frame.isEquipped) {
+            delete frame.isEquipped;
+            equippedFrame = createStarterFrame();
+          } else {
+            if (equippedFrame && equippedFrame.isEquipped) delete equippedFrame.isEquipped;
+            equippedFrame = frame; frame.isEquipped = true;
+          }
+          equippedCores.length = 0;
+          resizeEquippedCores();
+          pendingFrameSlot = false; invSection = 'slots'; invRightCursor = 0;
+        }
+      } else if (invSection === 'cores') {
+        // × on a core → equip it into the pending/selected slot, return to slots
+        const core = coreInventory[invLeftCursor];
+        if (core) {
+          const targetSlot = pendingSlot >= 0 ? pendingSlot : invRightCursor;
+          if (core.equippedSlot === targetSlot) {
+            delete core.equippedSlot;
+            equippedCores[targetSlot] = null;
+          } else {
+            if (core.equippedSlot !== undefined) equippedCores[core.equippedSlot] = null;
+            if (equippedCores[targetSlot]) delete equippedCores[targetSlot].equippedSlot;
+            equippedCores[targetSlot] = core;
+            core.equippedSlot = targetSlot;
+          }
+          recalcEquip();
+          invRightCursor = targetSlot;
+          pendingSlot = -1;
+          invSection = 'slots';
+        }
+      } else if (invRightCursor === -1) {
+        // × on frame slot → enter frame select mode (orange)
+        pendingFrameSlot = true; pendingSlot = -1;
+        invSection = 'frames';
+        if (invFrameCursor >= frameInventory.length) invFrameCursor = 0;
+      } else {
+        // × on a slot → start blinking that slot, switch to cores to pick
+        pendingSlot = invRightCursor;
+        invSection = 'cores';
+        if (invLeftCursor >= coreInventory.length) invLeftCursor = 0;
+      }
+    }
+    prev['_b0'] = cross;
+
+    // D-pad navigation in inventory
+    if (inventoryOpen) {
+      const fc = equippedFrame.cols, fr = equippedFrame.rows;
+
+      const gpNav = (dir) => {
+        if (invSection === 'slots') {
+          if (invRightCursor === -1) {
+            if (dir === 'right') invRightCursor = 0;
+          } else {
+          const col = invRightCursor % fc, row = Math.floor(invRightCursor / fc);
+          if (dir === 'left')  invRightCursor = col > 0 ? invRightCursor - 1 : -1;
+          if (dir === 'right') invRightCursor = col < fc-1 ? invRightCursor + 1 : invRightCursor;
+          if (dir === 'up')    invRightCursor = row > 0 ? invRightCursor - fc : invRightCursor;
+          if (dir === 'down')  { if (row < fr-1) invRightCursor += fc; }
+          }
+        } else if (invSection === 'frames') {
+          if (dir === 'up') {
+            if (invFrameCursor >= invCPerRowFrames) invFrameCursor -= invCPerRowFrames;
+            else if (!pendingFrameSlot) { invSection = 'slots'; }
+          }
+          if (dir === 'down')  invFrameCursor = Math.min(Math.max(0, frameInventory.length - 1), invFrameCursor + invCPerRowFrames);
+          if (dir === 'left')  invFrameCursor = Math.max(0, invFrameCursor - 1);
+          if (dir === 'right') {
+            const col = invFrameCursor % invCPerRowFrames;
+            if (col < invCPerRowFrames - 1 && invFrameCursor + 1 < frameInventory.length) invFrameCursor++;
+            else if (!pendingFrameSlot) invSection = 'cores';
+          }
+        } else { // 'cores'
+          if (dir === 'up') {
+            if (invLeftCursor >= invCPerRowCores) invLeftCursor -= invCPerRowCores;
+            else if (pendingSlot === null) invSection = 'slots';
+          }
+          if (dir === 'down')  invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + invCPerRowCores);
+          if (dir === 'right') invLeftCursor = Math.min(Math.max(0, coreInventory.length - 1), invLeftCursor + 1);
+          if (dir === 'left') {
+            const col = invLeftCursor % invCPerRowCores;
+            if (col > 0) invLeftCursor--;
+            else if (pendingSlot === null) invSection = 'frames';
+          }
+        }
+      };
+
+      const dRight = anyBtn(15);
+      if (dRight && !(prev['_dR'] ?? false)) gpNav('right');
+      prev['_dR'] = dRight;
+      const dLeft = anyBtn(14);
+      if (dLeft && !(prev['_dL'] ?? false)) gpNav('left');
+      prev['_dL'] = dLeft;
+      const dDown = anyBtn(13);
+      if (dDown && !(prev['_dD'] ?? false)) gpNav('down');
+      prev['_dD'] = dDown;
+      const dUp = anyBtn(12);
+      if (dUp && !(prev['_dU'] ?? false)) gpNav('up');
+      prev['_dU'] = dUp;
+    }
+
+    const b9 = anyBtn(9);
+    if (b9 && !(prev['_b9'] ?? false)) spawnEnemy();
+    prev['_b9'] = b9;
+
+    const b8 = anyBtn(8);
+    if (b8 && !(prev['_b8'] ?? false)) location.reload();
+    prev['_b8'] = b8;
+  }
+}
+
+function updatePlayer(dt) {
+  // Keyboard movement (skip if gamepad left stick is active)
+  let mx = 0, my = 0;
+  if (!keys['_gpL']) {
+    if (keys['w'] || keys['arrowup'])    my -= 1;
+    if (keys['s'] || keys['arrowdown'])  my += 1;
+    if (keys['a'] || keys['arrowleft'])  mx -= 1;
+    if (keys['d'] || keys['arrowright']) mx += 1;
+    const ml = Math.hypot(mx, my) || 1;
+    if (mx || my) { mx /= ml; my /= ml; }
+    player.vx = player.vx * Math.pow(0.75, dt) + mx * 3.8 * equipStats.speedMult * (1 - Math.pow(0.75, dt));
+    player.vy = player.vy * Math.pow(0.75, dt) + my * 3.8 * equipStats.speedMult * (1 - Math.pow(0.75, dt));
+  }
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+  resolveWall(player, 12);
+
+  // Player-enemy collision
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const eRad = Math.max(e.cols, e.rows) * BLOCK / 2 + 4;
+    const minDist = 12 + eRad;
+    const dx = player.x - e.x, dy = player.y - e.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0 && dist < minDist) {
+      const overlap = minDist - dist;
+      const nx = dx / dist, ny = dy / dist;
+      // Push player away 70%, nudge enemy 30%
+      player.x += nx * overlap * 0.7;
+      player.y += ny * overlap * 0.7;
+      e.x -= nx * overlap * 0.3;
+      e.y -= ny * overlap * 0.3;
+      // Dampen velocity components along collision axis
+      const pDot = player.vx * nx + player.vy * ny;
+      if (pDot < 0) { player.vx -= pDot * nx * 0.6; player.vy -= pDot * ny * 0.6; }
+      const eDot = e.vx * nx + e.vy * ny;
+      if (eDot > 0) { e.vx -= eDot * nx * 0.4; e.vy -= eDot * ny * 0.4; }
+    }
+  }
+
+  playerTrail.unshift({ x: player.x, y: player.y, a: player.angle });
+  if (playerTrail.length > 8) playerTrail.pop();
+
+  if (!gp.aimActive) {
+    const spd2 = Math.hypot(player.vx, player.vy);
+    if (spd2 > 0.8) {
+      // Auto-face movement direction; keep reticle at fixed distance so it stays on screen
+      player.angle = Math.atan2(player.vy, player.vx);
+      mouse.x = W/2 + Math.cos(player.angle) * 120;
+      mouse.y = H/2 + Math.sin(player.angle) * 120;
+    } else {
+      // Stopped: restore real mouse position, but only update angle if mouse has been moved
+      mouse.x = mouse.realX; mouse.y = mouse.realY;
+      if (mouse.hasMoved) player.angle = Math.atan2(mouse.y - H/2, mouse.x - W/2);
+      // else keep current angle (last facing direction from movement)
+    }
+  }
+  if (player.cooldown > 0)      player.cooldown -= dt;
+  if (player.muzzle > 0)        player.muzzle -= dt;
+  if (player.slashCooldown > 0) player.slashCooldown -= dt;
+  if (player.dodgeCooldown > 0) player.dodgeCooldown -= dt;
+  if (player.dodgeTimer    > 0) player.dodgeTimer    -= dt;
+  if (player.collectFlash > 0)  player.collectFlash -= dt;
+
+  if (player.rightHeld && player.slashCooldown <= 0)
+    player.chargeTime = Math.min(player.chargeTime + dt, MAX_CHARGE);
+  if (mouse.held && player.cooldown <= 0) tryShoot();
+
+  // Advance slash visuals
+  for (let i = slashes.length - 1; i >= 0; i--) {
+    slashes[i].life -= slashes[i].decay * dt;
+    if (slashes[i].life <= 0) slashes.splice(i, 1);
+  }
+
+  player.orbitAngle += 0.045 * equipStats.orbitSpeedMult * dt;
+
+  // Camera follows player
+  camX = W/2 - player.x;
+  camY = H/2 - player.y;
+  shake *= Math.pow(0.82, dt);
+
+  // Orbiting triangles damage enemies and walls
+  {
+    const ORBIT_R = 50;
+    const orbitTotal = (activeSkills.has(2) ? 3 : 0) + equipStats.extraOrbits;
+    for (let i = 0; i < orbitTotal; i++) {
+      const oa = player.orbitAngle + (i / orbitTotal) * Math.PI * 2;
+      const ox = player.x + Math.cos(oa) * ORBIT_R;
+      const oy = player.y + Math.sin(oa) * ORBIT_R;
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        const half = Math.max(e.cols, e.rows) * BLOCK / 2 + 4;
+        if (Math.abs(ox - e.x) > half || Math.abs(oy - e.y) > half) continue;
+        chipEnemy(e, ox, oy);
+      }
+      if (dungeon.length) {
+        const otx = Math.floor((ox - DOX) / TILE);
+        const oty = Math.floor((oy - DOY) / TILE);
+        if (otx >= 0 && otx < DW && oty >= 0 && oty < DH) {
+          const wh = dungeon[oty][otx];
+          if (wh > 0 && wh < 999) damageWall(otx, oty, ox, oy, oa + Math.PI);
+        }
+      }
+    }
+  }
+}
+
+function updateGold(dt) {
+  if (player.goldDisplay < player.exp) {
+    const diff = player.exp - player.goldDisplay;
+    const step = Math.max(1, Math.floor(diff * 0.25));
+    player.goldDisplay = Math.min(player.exp, player.goldDisplay + step);
+  }
+  if (player.goldPop > 0) player.goldPop = Math.max(0, player.goldPop - 0.07 * dt);
+  for (let i = pickupLog.length - 1; i >= 0; i--) {
+    pickupLog[i].life -= 0.0055 * dt;
+    pickupLog[i].slideAge += dt;
+    if (pickupLog[i].life <= 0) pickupLog.splice(i, 1);
+  }
+}
+
+function updateBullets(dt) {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.prev = { x: b.x, y: b.y };
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (Math.hypot(b.x - player.x, b.y - player.y) > 700) { bullets.splice(i, 1); continue; }
+    {
+      const btx = Math.floor((b.x - DOX) / TILE);
+      const bty = Math.floor((b.y - DOY) / TILE);
+      const wallHp = (btx < 0 || btx >= DW || bty < 0 || bty >= DH) ? 999 : dungeon[bty][btx];
+      if (wallHp > 0) {
+        damageWall(btx, bty, b.x, b.y, Math.atan2(b.vy, b.vx));
+        bullets.splice(i, 1);
+        continue;
+      }
+    }
+    let hit = false;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const half = Math.max(e.cols, e.rows) * BLOCK / 2 + 4;
+      if (Math.abs(b.x - e.x) > half || Math.abs(b.y - e.y) > half) continue;
+      if (chipEnemy(e, b.x, b.y)) { hit = true; break; }
+    }
+    if (hit) bullets.splice(i, 1);
+  }
+}
+
+function updateEnemies(dt) {
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const dx = player.x - e.x, dy = player.y - e.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 90) { e.vx += (dx/d)*0.035*dt; e.vy += (dy/d)*0.035*dt; }
+    e.vx *= Math.pow(0.95, dt); e.vy *= Math.pow(0.95, dt);
+    e.x += e.vx * dt; e.y += e.vy * dt;
+    resolveWall(e, Math.max(e.cols, e.rows) * BLOCK / 2 + 4);
+    e.angle += 0.005 * dt;
+    e.blinkT += 0.025 * dt;
+
+    // Core afterimage trail
+    const spd = Math.hypot(e.vx, e.vy);
+    if (spd > 0.3 && coreTrails.length < 400) {
+      const gw = e.cols * BLOCK, gh = e.rows * BLOCK;
+      const cos = Math.cos(e.angle), sin = Math.sin(e.angle);
+      for (let r = 0; r < e.rows; r++) {
+        for (let c = 0; c < e.cols; c++) {
+          if (!e.grid[r][c].alive || !e.grid[r][c].isCore) continue;
+          const lx = -gw/2 + c*BLOCK + CELL/2, ly = -gh/2 + r*BLOCK + CELL/2;
+          coreTrails.push({
+            x: e.x + cos*lx - sin*ly,
+            y: e.y + sin*lx + cos*ly,
+            life: 1, decay: 0.022 + Math.random() * 0.012
+          });
+        }
+      }
+    }
+    if (e.hitFlash > 0)  e.hitFlash -= dt;
+    if (e.coreFlash > 0) e.coreFlash -= dt;
+    if (e.alpha < 1) e.alpha = Math.min(1, e.alpha + 0.016 * dt);
+
+    // Shell self-repair: restore one non-core cell periodically while core lives
+    {
+      const coreAlive = e.grid.some(row => row.some(cell => cell.isCore && cell.alive));
+      if (coreAlive) {
+        const deadNonCore = [];
+        for (let r = 0; r < e.rows; r++)
+          for (let c = 0; c < e.cols; c++)
+            if (!e.grid[r][c].alive && !e.grid[r][c].isCore)
+              deadNonCore.push([r, c]);
+        if (deadNonCore.length > 0) {
+          e.repairTimer -= dt;
+          if (e.repairTimer <= 0) {
+            const [pr, pc] = deadNonCore[Math.floor(Math.random() * deadNonCore.length)];
+            e.grid[pr][pc].alive = true;
+            e.repairTimer = 55;
+            const gw2 = e.cols * BLOCK, gh2 = e.rows * BLOCK;
+            const ox2 = -gw2/2, oy2 = -gh2/2;
+            const lcx2 = ox2 + pc*BLOCK + CELL/2, lcy2 = oy2 + pr*BLOCK + CELL/2;
+            const wcos2 = Math.cos(e.angle), wsin2 = Math.sin(e.angle);
+            const rwx = e.x + wcos2*lcx2 - wsin2*lcy2;
+            const rwy = e.y + wsin2*lcx2 + wcos2*lcy2;
+            for (let i = 0; i < 6; i++) {
+              const a = Math.random() * Math.PI * 2;
+              sparks.push({ x: rwx, y: rwy,
+                vx: Math.cos(a)*(1+Math.random()*2.5), vy: Math.sin(a)*(1+Math.random()*2.5),
+                life: 1, decay: 0.03+Math.random()*0.03, r: 1.8, isCore: false });
+            }
+          }
+        }
+      }
+    }
+
+    // Core relocation: move core to a different cell after timeout
+    if (!e.coreMoveTimer) e.coreMoveTimer = 480;
+    e.coreMoveTimer -= dt;
+    if (e.coreMoveTimer <= 0) {
+      const aliveNonCore = [];
+      for (let r = 0; r < e.rows; r++)
+        for (let c = 0; c < e.cols; c++)
+          if (e.grid[r][c].alive && !e.grid[r][c].isCore)
+            aliveNonCore.push([r, c]);
+      if (aliveNonCore.length > 0) {
+        for (let r = 0; r < e.rows; r++)
+          for (let c = 0; c < e.cols; c++)
+            e.grid[r][c].isCore = false;
+        const [nr, nc] = aliveNonCore[Math.floor(Math.random() * aliveNonCore.length)];
+        e.grid[nr][nc].isCore = true;
+        e.coreFlash = 14;
+        const gw2 = e.cols * BLOCK, gh2 = e.rows * BLOCK;
+        const ox2 = -gw2/2, oy2 = -gh2/2;
+        const lcx2 = ox2 + nc*BLOCK + CELL/2, lcy2 = oy2 + nr*BLOCK + CELL/2;
+        const wcos2 = Math.cos(e.angle), wsin2 = Math.sin(e.angle);
+        const nwx = e.x + wcos2*lcx2 - wsin2*lcy2;
+        const nwy = e.y + wsin2*lcx2 + wcos2*lcy2;
+        for (let i = 0; i < 12; i++) {
+          const a = Math.random() * Math.PI * 2;
+          sparks.push({ x: nwx, y: nwy,
+            vx: Math.cos(a)*(2+Math.random()*4), vy: Math.sin(a)*(2+Math.random()*4),
+            life: 1, decay: 0.022+Math.random()*0.022, r: 2.2, isCore: true });
+        }
+      }
+      e.coreMoveTimer = 420 + Math.floor(Math.random() * 300);
+    }
+
+    // Separation: push apart overlapping enemies
+    for (const other of enemies) {
+      if (other === e || !other.alive) continue;
+      const sep = (Math.max(e.cols, e.rows) + Math.max(other.cols, other.rows)) * BLOCK / 2 + 14;
+      const sdx = e.x - other.x, sdy = e.y - other.y;
+      const sd = Math.hypot(sdx, sdy);
+      if (sd < sep && sd > 0) {
+        const f = (sep - sd) / sep * 0.4;
+        e.vx += (sdx/sd)*f*dt; e.vy += (sdy/sd)*f*dt;
+      }
+    }
+  }
+}
+
+function updateOrbs(dt) {
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    o.phase += 0.08 * dt;
+    o.timer -= dt;
+    if (o.timer <= 0) { orbs.splice(i, 1); continue; }
+    const dx = player.x - o.x, dy = player.y - o.y;
+    const d = Math.hypot(dx, dy);
+    const attractStr = d < 120 ? 0.18 : 0.04;
+    o.vx = o.vx * Math.pow(0.92, dt) + (dx / (d || 1)) * attractStr * dt;
+    o.vy = o.vy * Math.pow(0.92, dt) + (dy / (d || 1)) * attractStr * dt;
+    o.x += o.vx * dt; o.y += o.vy * dt;
+    if (d < 16) {
+      player.exp += o.value;
+      player.goldPop = 1.0;
+      player.collectFlash = 8;
+      spawnGoldBurst(o.x, o.y, o.value);
+      orbs.splice(i, 1);
+      rumble(0, 0.18 * Math.min(o.value / 5, 1.0), 40);
+    }
+  }
+}
+
+function updateDrops(dt) {
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i];
+    d.phase += 0.06 * dt;
+    d.timer -= dt;
+    if (d.timer <= 0) { drops.splice(i, 1); continue; }
+    const dx = player.x - d.x, dy = player.y - d.y;
+    const dist = Math.hypot(dx, dy);
+    const attract = dist < 100 ? 0.14 : 0.02;
+    d.vx = d.vx * Math.pow(0.90, dt) + (dx / (dist || 1)) * attract * dt;
+    d.vy = d.vy * Math.pow(0.90, dt) + (dy / (dist || 1)) * attract * dt;
+    d.x += d.vx * dt; d.y += d.vy * dt;
+    if (dist < 18) {
+      if (d.kind === 'core') {
+        coreInventory.push(d.data);
+        if (coreInventory.length > 20) coreInventory.shift();
+        pickupLog.push({ label: `${d.data.label}  ${d.data.rarity.label}`, color: d.data.rarity.color, life: 1, slideAge: 0 });
+      } else {
+        frameInventory.push(d.data);
+        if (frameInventory.length > 20) frameInventory.shift();
+        pickupLog.push({ label: `${d.data.label}  ${d.data.rarity.label}`, color: d.data.rarity.color, life: 1, slideAge: 0 });
+      }
+      if (pickupLog.length > 10) pickupLog.shift();
+      drops.splice(i, 1);
+      player.collectFlash = 8;
+      rumble(0, 0.28, 80);
+    }
+  }
+}
+
+function updateParticles(dt) {
+  if (shards.length > 200) shards.splice(0, shards.length - 200);
+  for (let i = shards.length - 1; i >= 0; i--) {
+    const s = shards[i];
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.vx *= Math.pow(0.94, dt); s.vy *= Math.pow(0.94, dt);
+    s.rot += s.rotV * dt;
+    s.life -= s.decay * dt;
+    if (s.life <= 0) {
+      if (s.fromEnemy && debris.length < 600) {
+        const count = 2 + Math.floor(Math.random() * 2);
+        for (let di = 0; di < count && debris.length < 600; di++) {
+          const ox = (Math.random() - 0.5) * s.size * 0.6;
+          const oy = (Math.random() - 0.5) * s.size * 0.6;
+          const px = s.x + ox, py = s.y + oy;
+          const dtx = Math.floor((px - DOX) / TILE), dty = Math.floor((py - DOY) / TILE);
+          const onFloor = dtx >= 0 && dtx < DW && dty >= 0 && dty < DH && dungeon[dty][dtx] === 0;
+          if (onFloor)
+            debris.push({ x: px, y: py, rot: Math.random() * Math.PI * 2,
+              size: s.size * (0.15 + Math.random() * 0.2), isCore: s.isCore });
+        }
+      }
+      shards.splice(i, 1);
+    }
+  }
+  if (debris.length > 800) debris.splice(0, debris.length - 800);
+  for (let i = coreTrails.length - 1; i >= 0; i--) {
+    coreTrails[i].life -= coreTrails[i].decay * dt;
+    if (coreTrails[i].life <= 0) coreTrails.splice(i, 1);
+  }
+
+  if (sparks.length > 250) sparks.splice(0, sparks.length - 250);
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.vx *= Math.pow(0.9, dt); s.vy *= Math.pow(0.9, dt);
+    s.life -= s.decay * dt;
+    if (s.life <= 0) sparks.splice(i, 1);
+  }
+
+  if (goldBursts.length > 300) goldBursts.splice(0, goldBursts.length - 300);
+  for (let i = goldBursts.length - 1; i >= 0; i--) {
+    const gb = goldBursts[i];
+    gb.x += gb.vx * dt; gb.y += gb.vy * dt;
+    gb.vx *= Math.pow(0.87, dt); gb.vy *= Math.pow(0.87, dt);
+    gb.rot += gb.rotV * dt;
+    gb.life -= gb.decay * dt;
+    if (gb.life <= 0) goldBursts.splice(i, 1);
+  }
+}
+
+function update(dt) {
+  updateGold(dt);
+  updatePlayer(dt);
+  updateBullets(dt);
+  updateEnemies(dt);
+  updateOrbs(dt);
+  updateDrops(dt);
+  updateParticles(dt);
+}
+
+</script>
+<script>
+// ── Draw sub-functions ────────────────────────────────────────────────────────
+
+function drawDungeon() {
+  if (!dungeon.length) return;
+  const txMin = Math.max(0, Math.floor((-camX - DOX) / TILE) - 1);
+  const txMax = Math.min(DW - 1, Math.floor((W - camX - DOX) / TILE) + 1);
+  const tyMin = Math.max(0, Math.floor((-camY - DOY) / TILE) - 1);
+  const tyMax = Math.min(DH - 1, Math.floor((H - camY - DOY) / TILE) + 1);
+
+  for (let ty = tyMin; ty <= tyMax; ty++) {
+    for (let tx = txMin; tx <= txMax; tx++) {
+      const hp = dungeon[ty][tx];
+      const sx = DOX + tx * TILE + camX;
+      const sy = DOY + ty * TILE + camY;
+
+      if (hp === 0) {
+        // ── フロアタイル ──────────────────────────────────────────────
+        ctx.fillStyle = THEME.floor;
+        ctx.fillRect(sx, sy, TILE, TILE);
+
+        // アンビエントオクルージョン: 壁に接する辺を暗く
+        const N = ty > 0      && dungeon[ty - 1][tx] !== 0;
+        const S = ty < DH - 1 && dungeon[ty + 1][tx] !== 0;
+        const W = tx > 0      && dungeon[ty][tx - 1] !== 0;
+        const E = tx < DW - 1 && dungeon[ty][tx + 1] !== 0;
+        if (N || S || W || E) {
+          ctx.fillStyle = 'rgba(0,0,0,0.42)';
+          if (N) ctx.fillRect(sx,            sy,            TILE, 2);
+          if (S) ctx.fillRect(sx,            sy + TILE - 2, TILE, 2);
+          if (W) ctx.fillRect(sx,            sy,            2, TILE);
+          if (E) ctx.fillRect(sx + TILE - 2, sy,            2, TILE);
+          ctx.fillStyle = 'rgba(0,0,0,0.18)';
+          if (N) ctx.fillRect(sx,            sy + 2,        TILE, 2);
+          if (S) ctx.fillRect(sx,            sy + TILE - 4, TILE, 2);
+          if (W) ctx.fillRect(sx + 2,        sy,            2, TILE);
+          if (E) ctx.fillRect(sx + TILE - 4, sy,            2, TILE);
+        }
+
+      } else if (hp === 999) {
+        // ── 堅牢壁 ───────────────────────────────────────────────────
+        ctx.fillStyle = '#020202';
+        ctx.fillRect(sx, sy, TILE, TILE);
+
+      } else {
+        // ── 破壊可能壁 ───────────────────────────────────────────────
+        ctx.fillStyle = THEME.wallColors[hp - 1];
+        ctx.fillRect(sx, sy, TILE, TILE);
+        ctx.strokeStyle = 'rgba(104,104,104,0.06)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
+
+        if (hp === 1) {
+          const seed = tx * 7919 + ty * 3571;
+          ctx.strokeStyle = 'rgba(17,17,17,0.65)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          const cx2 = sx + TILE / 2, cy2 = sy + TILE / 2;
+          const cr = ((seed % 7) / 7) * Math.PI * 2;
+          ctx.moveTo(cx2 + Math.cos(cr) * 3,             cy2 + Math.sin(cr) * 3);
+          ctx.lineTo(cx2 + Math.cos(cr) * (TILE * 0.42), cy2 + Math.sin(cr) * (TILE * 0.42));
+          const cr2 = cr + 0.9;
+          ctx.moveTo(cx2 + Math.cos(cr2) * 2,             cy2 + Math.sin(cr2) * 2);
+          ctx.lineTo(cx2 + Math.cos(cr2) * (TILE * 0.28), cy2 + Math.sin(cr2) * (TILE * 0.28));
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+function drawDrops() {
+  for (const d of debris) {
+    const wx = d.x + camX, wy = d.y + camY;
+    ctx.save();
+    ctx.translate(wx, wy); ctx.rotate(d.rot);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = d.isCore ? '#1a1a1a' : '#3e3e3e';
+    const sz = d.size;
+    ctx.fillRect(-sz/2, -sz/2, sz, sz);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  for (const d of drops) {
+    const wx = d.x + camX, wy = d.y + camY;
+    const pulse = 0.85 + Math.sin(d.phase) * 0.15;
+    const r = 7 * pulse;
+    const col = d.data.rarity.color;
+    const alpha = d.timer < 90 ? Math.abs(Math.sin(d.timer * 0.12)) : 1;
+    const ph = d.phase;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(wx, wy);
+
+    // 外側ソフトグロー
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 6.5);
+    g.addColorStop(0, col + 'cc');
+    g.addColorStop(0.3, col + '55');
+    g.addColorStop(1, col + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, r * 6.5, 0, Math.PI * 2); ctx.fill();
+
+    // パルスリング (2本が交互に外に拡散)
+    for (let ri = 0; ri < 2; ri++) {
+      const ringT = ((ph * 0.45 + ri * Math.PI) % (Math.PI * 2)) / (Math.PI * 2);
+      const ringR = r * (1.6 + ringT * 4.5);
+      ctx.save();
+      ctx.globalAlpha = alpha * (1 - ringT) * 0.65;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.0 - ringT * 1.4;
+      ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // 回転6線スター (白グラデーションフェード)
+    ctx.save();
+    ctx.rotate(ph * 0.38);
+    for (let i = 0; i < 6; i++) {
+      const sa = (i / 6) * Math.PI * 2;
+      const len = r * (i % 2 === 0 ? 4.5 : 2.8);
+      const ex = Math.cos(sa) * len, ey = Math.sin(sa) * len;
+      const lg = ctx.createLinearGradient(0, 0, ex, ey);
+      lg.addColorStop(0, 'rgba(255,255,255,0.95)');
+      lg.addColorStop(0.45, 'rgba(255,255,255,0.3)');
+      lg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = lg;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(ex, ey); ctx.stroke();
+    }
+    ctx.restore();
+
+    // 逆回転4線 (レアリティカラーフェード)
+    ctx.save();
+    ctx.rotate(-ph * 0.62 + Math.PI / 4);
+    for (let i = 0; i < 4; i++) {
+      const sa = (i / 4) * Math.PI * 2;
+      const len = r * 3.2;
+      const ex = Math.cos(sa) * len, ey = Math.sin(sa) * len;
+      const lg2 = ctx.createLinearGradient(0, 0, ex, ey);
+      lg2.addColorStop(0, col + 'ff');
+      lg2.addColorStop(0.6, col + '55');
+      lg2.addColorStop(1, col + '00');
+      ctx.strokeStyle = lg2;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(ex, ey); ctx.stroke();
+    }
+    ctx.restore();
+
+    // オービット小ダイヤ (5個・異なる速度と半径)
+    for (let i = 0; i < 5; i++) {
+      const angle = ph * (0.85 + i * 0.23) + (i / 5) * Math.PI * 2;
+      const orbitR = r * (2.1 + (i % 3) * 0.95);
+      const sx = Math.cos(angle) * orbitR;
+      const sy = Math.sin(angle) * orbitR;
+      const ss = r * (0.30 + Math.sin(ph * 1.9 + i * 1.4) * 0.10);
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(angle + Math.PI / 4);
+      ctx.shadowColor = i % 2 === 0 ? '#ffffff' : col;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.98)' : col;
+      ctx.beginPath();
+      ctx.moveTo(0, -ss * 1.3); ctx.lineTo(ss * 0.65, 0);
+      ctx.lineTo(0, ss * 1.3); ctx.lineTo(-ss * 0.65, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    // 本体 (グラデーション塗り)
+    glow(col, 30);
+    const bodyG = ctx.createRadialGradient(0, -r * 0.5, 0, 0, 0, r * 2.1);
+    bodyG.addColorStop(0, '#ffffff');
+    bodyG.addColorStop(0.22, col);
+    bodyG.addColorStop(1, col + '99');
+    ctx.fillStyle = bodyG;
+    ctx.beginPath();
+    if (d.kind === 'frame') {
+      ctx.moveTo(0, -r * 1.7);
+      ctx.lineTo(r * 1.5, r * 1.1);
+      ctx.lineTo(-r * 1.5, r * 1.1);
+    } else {
+      ctx.moveTo(0, -r * 1.5); ctx.lineTo(r * 0.9, 0);
+      ctx.lineTo(0,  r * 1.5); ctx.lineTo(-r * 0.9, 0);
+    }
+    ctx.closePath(); ctx.fill();
+    noGlow();
+
+    // ハイライト
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.beginPath();
+    if (d.kind === 'frame') {
+      ctx.moveTo(0, -r * 1.7); ctx.lineTo(r * 1.5, r * 1.1); ctx.lineTo(0, r * 0.1);
+    } else {
+      ctx.moveTo(0, -r * 1.5); ctx.lineTo(r * 0.9, 0); ctx.lineTo(0, 0);
+    }
+    ctx.closePath(); ctx.fill();
+
+    // 中心輝点グラデーション
+    const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.65);
+    cg.addColorStop(0, 'rgba(255,255,255,1)');
+    cg.addColorStop(0.5, 'rgba(255,255,255,0.7)');
+    cg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.65, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (const s of shards) {
+    const wx = s.x + camX, wy = s.y + camY;
+    ctx.save();
+    ctx.translate(wx, wy); ctx.rotate(s.rot);
+    ctx.globalAlpha = s.life * s.life;
+    ctx.fillStyle = s.isCore ? THEME.red : '#464646';
+    ctx.fillRect(-s.size/2*s.life, -s.size/2*s.life, s.size*s.life, s.size*s.life);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  for (const s of sparks) {
+    const wx = s.x + camX, wy = s.y + camY;
+    ctx.globalAlpha = s.life;
+    ctx.fillStyle = s.isCore ? THEME.red : '#313131';
+    ctx.fillRect(wx - s.r, wy - s.r, s.r*2, s.r*2);
+    ctx.globalAlpha = 1;
+  }
+
+  for (const gb of goldBursts) {
+    const wx = gb.x + camX, wy = gb.y + camY;
+    const s  = gb.size * (0.4 + gb.life * 0.6);
+    ctx.save();
+    ctx.globalAlpha = gb.life * gb.life;
+    ctx.translate(wx, wy);
+    ctx.rotate(gb.rot);
+    ctx.shadowColor = '#d0d0d0';
+    ctx.shadowBlur  = 7;
+    const sg = ctx.createLinearGradient(-s, -s, s, s);
+    sg.addColorStop(0,    '#f6f6f6');
+    sg.addColorStop(0.35, '#d0d0d0');
+    sg.addColorStop(1,    '#949494');
+    ctx.fillStyle = sg;
+    ctx.fillRect(-s, -s * 0.78, s * 2, s * 1.56);
+    // ハイライト
+    ctx.fillStyle = 'rgba(255,255,255,' + (gb.life * 0.55) + ')';
+    ctx.fillRect(-s, -s * 0.78, s * 0.9, s * 0.7);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  for (const o of orbs) {
+    ctx.save();
+    ctx.globalAlpha = o.timer < 60 ? Math.abs(Math.sin(o.timer * 0.16)) : 1;
+    drawOrb(o.x + camX, o.y + camY, o.phase);
+    ctx.restore();
+  }
+}
+
+function drawOrb(ox, oy, phase) {
+  const pulse = 0.85+Math.sin(phase)*0.15;
+  const r = 5*pulse;
+
+  ctx.save();
+  ctx.translate(ox,oy);
+
+  // 外側グロー（青、薄め）
+  const g = ctx.createRadialGradient(0,0,0,0,0,r*3.5);
+  g.addColorStop(0, 'rgba(30,80,180,0.35)');
+  g.addColorStop(1, 'rgba(10,30,100,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0,0,r*3.5,0,Math.PI*2); ctx.fill();
+
+  // スパークライン（白）
+  ctx.save();
+  ctx.rotate(phase*0.8);
+  ctx.strokeStyle = 'rgba(200,220,255,0.45)';
+  ctx.lineWidth = 0.7;
+  for(let si=0;si<4;si++){
+    const sa=(si/4)*Math.PI*2;
+    const len=r*(si%2===0?2.8:1.8);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(sa)*len,Math.sin(sa)*len); ctx.stroke();
+  }
+  ctx.restore();
+
+  // ダイヤ本体（青差し色）
+  const dr=r*pulse;
+  glow(THEME.blue, 14);
+  ctx.fillStyle = THEME.blueHi;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.moveTo(0,-dr*1.45); ctx.lineTo(dr*.85,0); ctx.lineTo(0,dr*1.45); ctx.lineTo(-dr*.85,0);
+  ctx.closePath(); ctx.fill();
+  noGlow();
+  ctx.globalAlpha = 1;
+
+  // ハイライト（白）
+  ctx.fillStyle = 'rgba(220,235,255,0.75)';
+  ctx.beginPath(); ctx.moveTo(0,-dr*1.45); ctx.lineTo(dr*.85,0); ctx.lineTo(0,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(dr*.1,-dr*.25,dr*.22,0,Math.PI*2); ctx.fill();
+
+  ctx.restore();
+}
+
+
+function drawEnemies() {
+  // Core afterimage trails (drawn before enemies so they appear behind)
+  for (const t of coreTrails) {
+    const wx = t.x + camX, wy = t.y + camY;
+    const a = t.life * t.life;
+    const r = CELL * 0.6 * (0.4 + t.life * 0.6);
+    ctx.save();
+    const g = ctx.createRadialGradient(wx, wy, 0, wx, wy, r);
+    g.addColorStop(0, `rgba(57,57,57,${a * 0.55})`);
+    g.addColorStop(1, `rgba(26,26,26,0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(wx, wy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const wx = e.x + camX, wy = e.y + camY;
+    const breathe = 0.97 + Math.sin(e.blinkT * 0.18) * 0.03;
+    ctx.save();
+    ctx.translate(wx, wy);
+    ctx.scale(breathe, breathe);
+    ctx.rotate(e.angle);
+    ctx.globalAlpha = e.alpha ?? 1;
+    const gw = e.cols * BLOCK, gh = e.rows * BLOCK;
+    const ox = -gw/2, oy = -gh/2;
+    const blink = Math.sin(e.blinkT * 0.18) * 0.5 + 0.5;
+    for (let r = 0; r < e.rows; r++) {
+      for (let c = 0; c < e.cols; c++) {
+        const cell = e.grid[r][c];
+        if (!cell.alive) continue;
+        const cx = ox + c * BLOCK, cy = oy + r * BLOCK;
+        if (cell.isCore) {
+          // コアのみ赤差し色
+          const rv = Math.floor(100 + blink * 120);
+          glow(`rgb(${rv},0,0)`, 16);
+          ctx.fillStyle = `rgb(${rv},0,0)`;
+          ctx.fillRect(cx, cy, CELL, CELL);
+          noGlow();
+        } else {
+          const flash = e.hitFlash > 0 ? e.hitFlash / 6 : 0;
+          const v = Math.floor((cell.hp === 2 ? 180 : 110) + flash * 75);
+          ctx.fillStyle = `rgb(${v},${v},${v})`;
+          ctx.fillRect(cx, cy, CELL, CELL);
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(cx, cy, CELL, CELL);
+        }
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function drawBullets() {
+  for (const b of bullets) {
+    const bx = b.x + camX, by = b.y + camY;
+    if (b.prev) {
+      const px = b.prev.x + camX, py = b.prev.y + camY;
+      // トレイル
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(bx, by);
+      ctx.strokeStyle = 'rgba(189,189,189,0.22)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    glow(THEME.white, 12);
+    ctx.fillStyle = THEME.white;
+    ctx.fillRect(bx - 2.5, by - 2.5, 5, 5);
+    noGlow();
+  }
+}
+
+function drawSlashes() {
+  for (const s of slashes) {
+    const wx = s.x + camX, wy = s.y + camY;
+    const t = s.life;
+
+    if (s.hit === 'spin') {
+      const expand = 1 - t;
+      const rOuter = s.r * (0.6 + expand * 0.5);
+      const rInner = s.r * (0.3 + expand * 0.4);
+
+      ctx.save();
+      ctx.globalAlpha = t * t * 0.9;
+      glow('#ffffff', 18);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3 * t;
+      ctx.beginPath();
+      ctx.arc(wx, wy, rOuter, 0, Math.PI * 2);
+      ctx.stroke();
+      noGlow();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = t * t * 0.55;
+      ctx.strokeStyle = '#cccccc';
+      ctx.lineWidth = 1.5 * t;
+      ctx.beginPath();
+      ctx.arc(wx, wy, rInner, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      const lineN = 8;
+      for (let li = 0; li < lineN; li++) {
+        const la = s.spinAngle + (li / lineN) * Math.PI * 2 + expand * Math.PI * 2;
+        ctx.save();
+        ctx.globalAlpha = t * 0.7;
+        glow('#ffffff', 10);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(wx + Math.cos(la) * rInner * 0.5, wy + Math.sin(la) * rInner * 0.5);
+        ctx.lineTo(wx + Math.cos(la) * rOuter,       wy + Math.sin(la) * rOuter);
+        ctx.stroke();
+        noGlow();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+    } else {
+      const sweep = Math.min(1, (1 - t) * 3);
+
+      ctx.save();
+      ctx.globalAlpha = t * t * 0.18;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(wx, wy);
+      ctx.arc(wx, wy, s.r * (0.4 + sweep * 0.6), s.arcFrom, s.arcFrom + (s.arcTo - s.arcFrom) * sweep);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      const lineCount = s.hit === 2 ? 4 : 3;
+      for (let li = 0; li < lineCount; li++) {
+        const frac = li / lineCount;
+        const aSweep = s.arcFrom + (s.arcTo - s.arcFrom) * sweep * (0.6 + frac * 0.4);
+        const r1 = s.r * (0.2 + frac * 0.5);
+        const r2 = s.r * (0.55 + frac * 0.45);
+        ctx.save();
+        ctx.globalAlpha = t * (1 - frac * 0.5) * (s.hit === 2 ? 0.9 : 0.75);
+        glow('#ffffff', 8);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = s.hit === 2 ? 2 : 1.5;
+        ctx.beginPath();
+        ctx.moveTo(wx + Math.cos(aSweep) * r1, wy + Math.sin(aSweep) * r1);
+        ctx.lineTo(wx + Math.cos(aSweep) * r2, wy + Math.sin(aSweep) * r2);
+        ctx.stroke();
+        noGlow();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.globalAlpha = t * 0.85;
+      glow('#ffffff', 14);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = s.hit === 2 ? 2.5 : 1.8;
+      ctx.beginPath();
+      ctx.arc(wx, wy, s.r * 0.82, s.arcFrom, s.arcFrom + (s.arcTo - s.arcFrom) * sweep);
+      ctx.stroke();
+      noGlow();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+}
+
+function drawPlayer() {
+  const px = player.x + camX, py = player.y + camY;
+  const tip = player.tipOffset, backW = 13;
+
+  // Orbiting triangles
+  {
+    const ORBIT_R = 50;
+    const orbitTotal = (activeSkills.has(2) ? 3 : 0) + equipStats.extraOrbits;
+    const ts = 7;
+    for (let i = 0; i < orbitTotal; i++) {
+      const oa = player.orbitAngle + (i / orbitTotal) * Math.PI * 2;
+      const ox = px + Math.cos(oa) * ORBIT_R;
+      const oy = py + Math.sin(oa) * ORBIT_R;
+      ctx.save();
+      ctx.translate(ox, oy);
+      ctx.rotate(oa + Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, -ts);
+      ctx.lineTo(ts * 0.7,  ts * 0.6);
+      ctx.lineTo(-ts * 0.7, ts * 0.6);
+      ctx.closePath();
+      glow('#949494', 8);
+      ctx.fillStyle = '#949494';
+      ctx.fill();
+      noGlow();
+      ctx.restore();
+    }
+  }
+
+  // Charge ring
+  if (player.rightHeld && player.chargeTime > 0) {
+    const frac = player.chargeTime / MAX_CHARGE;
+    const full = frac >= 1;
+    const pulseR = full ? (1 + Math.sin(Date.now() * 0.015) * 0.08) : 1;
+
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(px, py, 28 * pulseR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = full ? 0.95 : 0.75;
+    ctx.strokeStyle = full ? '#ffffff' : '#aaaaaa';
+    ctx.lineWidth = full ? 2.5 : 2;
+    ctx.beginPath();
+    ctx.arc(px, py, 28 * pulseR, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Guard ring
+  if (player.guarding) {
+    ctx.save();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(px, py, 44, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // 前方スポットライト（暗闇オーバーレイの下地として焼き込む）
+  {
+    const fwdX = px + Math.cos(player.angle) * 70;
+    const fwdY = py + Math.sin(player.angle) * 70;
+    const sg = ctx.createRadialGradient(fwdX, fwdY, 0, fwdX, fwdY, 110);
+    sg.addColorStop(0, 'rgba(255,255,255,0.12)');
+    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.arc(fwdX, fwdY, 110, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 自機トレイル
+  playerTrail.forEach((p, i) => {
+    const a = (playerTrail.length - i) / playerTrail.length;
+    ctx.save();
+    ctx.globalAlpha = a * 0.12;
+    ctx.translate(p.x + camX, p.y + camY); ctx.rotate(p.a);
+    ctx.fillStyle = '#4a4a4a';
+    ctx.beginPath();
+    ctx.moveTo(tip, 0);
+    ctx.lineTo(-tip * 0.5,  backW);
+    ctx.lineTo(-tip * 0.5, -backW);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(player.angle);
+
+  const isDodging  = player.dodgeTimer > 0;
+  const dodgeBlink = isDodging && Math.floor(Date.now() / 70) % 2 === 0;
+  const flashOn    = player.collectFlash > 0 || isDodging;
+  if (isDodging) ctx.globalAlpha = dodgeBlink ? 1 : 0.35;
+  glow(THEME.white, flashOn ? 28 : 10);
+  ctx.fillStyle = flashOn ? THEME.white : THEME.hi;
+  ctx.beginPath();
+  ctx.moveTo(tip, 0);
+  ctx.lineTo(-tip * 0.5, backW);
+  ctx.lineTo(-tip * 0.5, -backW);
+  ctx.closePath(); ctx.fill();
+  noGlow();
+  ctx.globalAlpha = 1;
+
+  if (player.muzzle > 0) {
+    const mf = player.muzzle / 7;
+    glow('#ffffff', 24);
+    ctx.fillStyle = `rgba(254,254,254,${mf * 0.9})`;
+    const fs = 7 * mf;
+    ctx.beginPath();
+    ctx.arc(tip, 0, fs, 0, Math.PI * 2);
+    ctx.fill();
+    noGlow();
+  }
+
+  ctx.restore();
+}
+
+
+function drawHUD() {
+  // Pickup log (bottom-right)
+  // GOLD counter (top-right) — 金の欠片アイコン＋数字
+  {
+    const pop     = player.goldPop;
+    const numStr  = String(player.goldDisplay);
+    const baseX   = W - 14;
+    const baseY   = 26;
+
+    ctx.save();
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 14px Orbitron';
+    const numW = ctx.measureText(numStr).width;
+
+    // 欠片グループ中心 (数字の左側)
+    const shCX = baseX - numW - 22;
+    const shCY = baseY - 6;
+
+    // 2枚の欠片 (後ろ→前の順で描画)
+    const shardDefs = [
+      { ox: -4, oy:  3, size: 6,  rot:  0.6  },
+      { ox:  4, oy: -3, size: 10, rot: -0.28, main: true },
+    ];
+
+    for (const sd of shardDefs) {
+      const s    = sd.size * (sd.main ? 1 + pop * 0.22 : 1);
+      const rota = sd.rot  + (sd.main ? pop * 0.12 : 0);
+
+      ctx.save();
+      ctx.translate(shCX + sd.ox, shCY + sd.oy);
+      ctx.rotate(rota);
+
+      // グロー
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur  = sd.main ? 14 : 6;
+
+      // ゴールドグラデーション
+      const sg = ctx.createLinearGradient(-s, -s, s, s);
+      sg.addColorStop(0,    '#fffab8');
+      sg.addColorStop(0.28, '#ffd700');
+      sg.addColorStop(0.62, '#c8920a');
+      sg.addColorStop(1,    '#6b4300');
+      ctx.fillStyle = sg;
+      ctx.fillRect(-s, -s, s * 2, s * 2);
+
+      // ハイライト (左上)
+      const hg = ctx.createLinearGradient(-s, -s, s * 0.4, s * 0.4);
+      hg.addColorStop(0, 'rgba(255,255,255,0.72)');
+      hg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hg;
+      ctx.shadowBlur = 0;
+      ctx.fillRect(-s, -s, s * 2, s * 2);
+
+      ctx.restore();
+    }
+
+    // 数字 (ポップスケール)
+    const ns = 1 + pop * 0.30;
+    ctx.save();
+    ctx.translate(baseX, baseY);
+    ctx.scale(ns, ns);
+    ctx.font = 'bold 14px Orbitron';
+    ctx.textAlign = 'right';
+    ctx.shadowColor = '#888888';
+    ctx.shadowBlur  = 8;
+    ctx.fillStyle   = '#e1e1e1';
+    ctx.fillText(numStr, 0, 0);
+    ctx.shadowBlur  = 0;
+    ctx.restore();
+
+    ctx.textAlign = 'left';
+  }
+
+  // Pickup log — below GOLD counter
+  if (pickupLog.length > 0) {
+    ctx.font = '11px Orbitron';
+    ctx.textAlign = 'right';
+    const logStartY = 58;
+    const lineH = 18;
+    const SLIDE_FRAMES = 16;
+    const FADE_LIFE   = 0.25;
+    for (let i = 0; i < pickupLog.length; i++) {
+      const entry = pickupLog[pickupLog.length - 1 - i];
+      const slideP = Math.min(entry.slideAge / SLIDE_FRAMES, 1);
+      const slideEase = 1 - Math.pow(1 - slideP, 3);
+      const xOff = (1 - slideEase) * 260;
+      const alpha = entry.life < FADE_LIFE ? entry.life / FADE_LIFE : 1;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = entry.color;
+      ctx.fillText(entry.label, W - 16 + xOff, logStartY + i * lineH);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+  }
+
+  if (inventoryOpen && invDirty) { renderInvDOM(); invDirty = false; }
+
+  // FPS counter (bottom-left)
+  {
+    const color = fps >= 55 ? '#cacaca' : fps >= 40 ? '#b5b5b5' : '#6c6c6c';
+    ctx.font = '11px Orbitron';
+    ctx.fillStyle = color;
+    ctx.fillText(`${fps} FPS`, 12, H - 10);
+  }
+
+  // Crosshair
+  if (inventoryOpen || invClosing) return;
+  const cx = mouse.x, cy = mouse.y, cs = 8;
+  ctx.strokeStyle = 'rgba(204,204,204,0.65)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx-cs,cy); ctx.lineTo(cx-3,cy);
+  ctx.moveTo(cx+3, cy); ctx.lineTo(cx+cs,cy);
+  ctx.moveTo(cx,cy-cs); ctx.lineTo(cx,cy-3);
+  ctx.moveTo(cx,cy+3);  ctx.lineTo(cx,cy+cs);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(204,204,204,0.5)';
+  ctx.fillRect(cx-1, cy-1, 2, 2);
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = THEME.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle line grid (camera-scrolling, not affected by shake)
+  {
+    const gs = 36;
+    const offX = (camX % gs + gs) % gs, offY = (camY % gs + gs) % gs;
+    ctx.strokeStyle = 'rgba(120,120,120,0.025)';
+    ctx.lineWidth = 1;
+    for (let x = offX; x < W; x += gs) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = offY; y < H; y += gs) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+
+  const sx = (Math.random()-0.5)*shake, sy = (Math.random()-0.5)*shake;
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  drawDungeon();
+  drawParticles();
+  drawDrops();
+  drawEnemies();
+  drawBullets();
+  drawSlashes();
+  drawPlayer();
+
+  ctx.restore();
+
+  const vignette = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.8);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.82)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, H);
+
+  // HUD drawn outside shake transform so it stays fixed
+  drawHUD();
+}
+
+</script>
+<script>
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let lastFrameTime = 0;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const elapsed = now - lastFrameTime;
+  lastFrameTime = now;
+  if (elapsed > 200) return;
+  const dt = elapsed / FRAME_MS;
+
+  fpsFrameCount++;
+  const fpsDelta = now - fpsLastTime;
+  if (fpsDelta >= 500) {
+    fps = Math.round(fpsFrameCount / fpsDelta * 1000);
+    fpsFrameCount = 0;
+    fpsLastTime = now;
+  }
+
+  updateInput(dt);
+  if (!inventoryOpen && !invClosing) { if (hitStop > 0) { hitStop -= dt; } else { update(dt); } }
+  draw();
+}
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

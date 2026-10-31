@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Design Mock — Mono + Accent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #080808; color: #444; font-family: monospace; }
+canvas { display: block; }
+#palette {
+  display: flex; gap: 0; border-bottom: 1px solid #111;
+}
+.sw {
+  flex: 1; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; letter-spacing: .08em;
+}
+</style>
+</head>
+<body>
+
+<!-- パレット帯 -->
+<div id="palette">
+  <div class="sw" style="background:#080808; color:#222">BG</div>
+  <div class="sw" style="background:#101010; color:#2a2a2a">Floor</div>
+  <div class="sw" style="background:#1e1e1e; color:#333">Wall hi</div>
+  <div class="sw" style="background:#141414; color:#222">Wall lo</div>
+  <div class="sw" style="background:#888; color:#111">Mid</div>
+  <div class="sw" style="background:#ccc; color:#444">Hi</div>
+  <div class="sw" style="background:#fff; color:#888">White</div>
+  <div class="sw" style="background:#080808; color:#333; border-left: 1px solid #1a1a1a"> </div>
+  <div class="sw" style="background:#7a0000; color:#ff4444">Red</div>
+  <div class="sw" style="background:#1a3a6a; color:#4488cc">Blue</div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight - 36;
+const W = canvas.width, H = canvas.height;
+
+// ── パレット定義 ─────────────────────────────────────
+const P = {
+  bg:       '#080808',
+  floor:    '#101010',
+  wallHi:   '#282828',   // HP2 壁
+  wallLo:   '#161616',   // HP1 壁（わずかに暗く）
+  mid:      '#888888',
+  hi:       '#cccccc',
+  white:    '#ffffff',
+  // 差し色（最小限）
+  red:      '#cc1111',   // 敵コアのみ
+  redGlow:  '#990000',
+  blue:     '#1a5faa',   // オーブのみ
+  blueHi:   '#5ab4ff',
+};
+
+// ── glow ─────────────────────────────────────────────
+function glow(col, blur) { ctx.shadowColor = col; ctx.shadowBlur = blur; }
+function noGlow()         { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; }
+
+// ── グリッド背景 ──────────────────────────────────────
+function drawGrid() {
+  const gs = 36;
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += gs) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += gs) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+}
+
+// ── ヴィネット ────────────────────────────────────────
+function drawVignette() {
+  const g = ctx.createRadialGradient(W/2,H/2,H*0.2, W/2,H/2,H*0.8);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.82)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+}
+
+// ── ラベル ────────────────────────────────────────────
+function lbl(text, x, y) {
+  ctx.save();
+  ctx.font = '8px monospace';
+  ctx.fillStyle = '#282828';
+  ctx.letterSpacing = '0.1em';
+  ctx.fillText(text.toUpperCase(), x, y);
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────
+// ① 壁 HP 状態
+// ─────────────────────────────────────────────────────
+function drawWallSection(bx, by) {
+  lbl('wall — hp states', bx, by - 10);
+  const states = [
+    { label:'HP 2', fill: P.wallHi, stroke:'rgba(255,255,255,0.06)' },
+    { label:'HP 1', fill: P.wallLo, stroke:'rgba(255,255,255,0.03)' },
+    { label:'HP 0', fill: null },
+  ];
+  states.forEach((s, i) => {
+    const x = bx + i * 72, y = by;
+    if (s.fill) {
+      ctx.fillStyle = s.fill;
+      ctx.fillRect(x, y, 56, 56);
+      ctx.strokeStyle = s.stroke;
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x, y, 56, 56);
+      // サブグリッド
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      [18,36].forEach(d => {
+        ctx.beginPath(); ctx.moveTo(x+d,y); ctx.lineTo(x+d,y+56); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x,y+d); ctx.lineTo(x+56,y+d); ctx.stroke();
+      });
+    } else {
+      ctx.strokeStyle = '#181818';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([3,4]);
+      ctx.strokeRect(x, y, 56, 56);
+      ctx.setLineDash([]);
+    }
+    ctx.font = '8px monospace';
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillText(s.label, x+16, y+70);
+  });
+}
+
+// ─────────────────────────────────────────────────────
+// ② 自機
+// ─────────────────────────────────────────────────────
+const playerTrail = [];
+
+function drawPlayer(px, py, angle, flash) {
+  const tip = 18, backW = 13;
+
+  // トレイル
+  playerTrail.forEach((p, i) => {
+    const a = i / playerTrail.length;
+    ctx.save();
+    ctx.globalAlpha = a * 0.12;
+    ctx.translate(p.x, p.y); ctx.rotate(p.a);
+    ctx.fillStyle = P.hi;
+    ctx.beginPath();
+    ctx.moveTo(tip,0); ctx.lineTo(-tip*.5,backW); ctx.lineTo(-tip*.5,-backW);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.translate(px, py); ctx.rotate(angle);
+  glow(P.white, flash ? 28 : 10);
+  ctx.fillStyle = flash ? P.white : P.hi;
+  ctx.beginPath();
+  ctx.moveTo(tip,0); ctx.lineTo(-tip*.5,backW); ctx.lineTo(-tip*.5,-backW);
+  ctx.closePath(); ctx.fill();
+  noGlow();
+
+  if (flash) {
+    glow('#fff', 30);
+    ctx.fillStyle = 'rgba(255,255,240,0.9)';
+    ctx.beginPath(); ctx.arc(tip,0,6,0,Math.PI*2); ctx.fill();
+    noGlow();
+  }
+  ctx.restore();
+}
+
+// チャージリング（モノクロ）
+function drawChargeRing(px, py, frac) {
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = P.hi; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(px,py,28,0,Math.PI*2); ctx.stroke();
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = frac>=1 ? P.white : P.mid;
+  ctx.lineWidth = frac>=1 ? 2 : 1.5;
+  ctx.beginPath(); ctx.arc(px,py,28,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// 軌道三角（白グロー）
+function drawOrbitTri(cx, cy, oa) {
+  const R=50, n=3, ts=7;
+  for (let i=0;i<n;i++) {
+    const a = oa+(i/n)*Math.PI*2;
+    const ox=cx+Math.cos(a)*R, oy=cy+Math.sin(a)*R;
+    ctx.save();
+    ctx.translate(ox,oy); ctx.rotate(a+Math.PI/2);
+    glow(P.white, 8);
+    ctx.fillStyle = P.mid;
+    ctx.beginPath();
+    ctx.moveTo(0,-ts); ctx.lineTo(ts*.7,ts*.6); ctx.lineTo(-ts*.7,ts*.6);
+    ctx.closePath(); ctx.fill();
+    noGlow();
+    ctx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// ③ 弾 (モノクロ + 白グロー)
+// ─────────────────────────────────────────────────────
+const bullets = Array.from({length:6},(_,i)=>({
+  x: 160+i*28, y: 0,  // yはシーンごとに上書き
+  trail: [],
+}));
+
+function resetBullets(y) {
+  bullets.forEach((b,i) => {
+    b.x = 160+i*28; b.y = y;
+    b.trail = Array.from({length:6},()=>({x:b.x,y:b.y}));
+  });
+}
+
+function updateBullets() {
+  bullets.forEach(b => {
+    for(let i=b.trail.length-1;i>0;i--){ b.trail[i].x=b.trail[i-1].x; b.trail[i].y=b.trail[i-1].y; }
+    b.trail[0].x=b.x; b.trail[0].y=b.y;
+    b.x += 4.5;
+    if (b.x > W+20) b.x = -10;
+  });
+}
+
+function drawBullets(offsetY) {
+  bullets.forEach(b => {
+    b.trail.forEach((tr,i)=>{
+      const a = (1-i/b.trail.length);
+      ctx.globalAlpha = a*0.3;
+      const s = 4*a;
+      ctx.fillStyle = P.hi;
+      ctx.fillRect(tr.x-s/2, offsetY+(tr.y-bullets[0].y)-s/2, s, s);
+      ctx.globalAlpha = 1;
+    });
+    glow(P.white, 12);
+    ctx.fillStyle = P.white;
+    ctx.fillRect(b.x-2.5, offsetY+(b.y-bullets[0].y)-2.5, 5, 5);
+    noGlow();
+  });
+}
+
+// ─────────────────────────────────────────────────────
+// ④ 敵 (外殻モノクロ, コアのみ赤)
+// ─────────────────────────────────────────────────────
+function drawEnemy(cx, cy, et, hitFlash, hpGrid) {
+  const BLOCK=11, CELL=11, cols=3, rows=3;
+  const ox=cx-cols*BLOCK/2, oy=cy-rows*BLOCK/2;
+  const breathe = 0.97+Math.sin(et*0.04)*0.03;
+
+  ctx.save();
+  ctx.translate(cx,cy); ctx.scale(breathe,breathe); ctx.translate(-cx,-cy);
+
+  const blink = Math.sin(et*0.18)*0.5+0.5;
+
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const cell = hpGrid[r][c];
+    if(cell.hp<=0) continue;
+    const ex=ox+c*BLOCK, ey=oy+r*BLOCK;
+    const isCore = r===1&&c===1;
+
+    if(isCore){
+      // コアのみ赤差し色
+      const rv = Math.floor(100+blink*120);
+      const col = `rgb(${rv},0,0)`;
+      glow(P.red, 18);
+      ctx.fillStyle = col;
+      ctx.fillRect(ex,ey,CELL,CELL);
+      noGlow();
+    } else {
+      // 外殻はモノクロ（HPで明度変化）
+      const flash = hitFlash>0 ? hitFlash/6 : 0;
+      const base  = cell.hp===2 ? 180 : 110;
+      const v = Math.floor(base + flash*75);
+      ctx.save();
+      glow(`rgba(255,255,255,${cell.hp===2?0.15:0.08})`, 6);
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(ex,ey,CELL,CELL);
+      noGlow();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(ex,ey,CELL,CELL);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────
+// ⑤ オーブ (青差し色, 控えめ)
+// ─────────────────────────────────────────────────────
+function drawOrb(ox, oy, phase) {
+  const pulse = 0.85+Math.sin(phase)*0.15;
+  const r = 5*pulse;
+
+  ctx.save();
+  ctx.translate(ox,oy);
+
+  // 外側グロー（青、薄め）
+  const g = ctx.createRadialGradient(0,0,0,0,0,r*3.5);
+  g.addColorStop(0, 'rgba(30,80,180,0.35)');
+  g.addColorStop(1, 'rgba(10,30,100,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0,0,r*3.5,0,Math.PI*2); ctx.fill();
+
+  // スパークライン（白）
+  ctx.save();
+  ctx.rotate(phase*0.8);
+  ctx.strokeStyle = 'rgba(200,220,255,0.45)';
+  ctx.lineWidth = 0.7;
+  for(let si=0;si<4;si++){
+    const sa=(si/4)*Math.PI*2;
+    const len=r*(si%2===0?2.8:1.8);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(sa)*len,Math.sin(sa)*len); ctx.stroke();
+  }
+  ctx.restore();
+
+  // ダイヤ本体（青差し色）
+  const dr=r*pulse;
+  glow(P.blue, 14);
+  ctx.fillStyle = P.blueHi;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.moveTo(0,-dr*1.45); ctx.lineTo(dr*.85,0); ctx.lineTo(0,dr*1.45); ctx.lineTo(-dr*.85,0);
+  ctx.closePath(); ctx.fill();
+  noGlow();
+  ctx.globalAlpha = 1;
+
+  // ハイライト（白）
+  ctx.fillStyle = 'rgba(220,235,255,0.75)';
+  ctx.beginPath(); ctx.moveTo(0,-dr*1.45); ctx.lineTo(dr*.85,0); ctx.lineTo(0,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(dr*.1,-dr*.25,dr*.22,0,Math.PI*2); ctx.fill();
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────
+// ⑥ 斬撃 (白グロー)
+// ─────────────────────────────────────────────────────
+function drawSlash(sx, sy, angle, life) {
+  const ah=1.1, r=80;
+  const sweep = Math.min(1,(1-life)*3);
+
+  ctx.save();
+  ctx.globalAlpha = life*life*0.12;
+  ctx.fillStyle = P.white;
+  ctx.beginPath();
+  ctx.moveTo(sx,sy);
+  ctx.arc(sx,sy,r*(0.4+sweep*0.6),angle-ah,angle-ah+ah*2*sweep);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  for(let li=0;li<4;li++){
+    const frac=li/4;
+    const aSweep=angle-ah+ah*2*sweep*(0.6+frac*0.4);
+    const r1=r*(0.2+frac*0.5), r2=r*(0.55+frac*0.45);
+    ctx.save();
+    ctx.globalAlpha = life*(1-frac*0.5)*0.85;
+    glow(P.white, 8);
+    ctx.strokeStyle = P.white;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx+Math.cos(aSweep)*r1,sy+Math.sin(aSweep)*r1);
+    ctx.lineTo(sx+Math.cos(aSweep)*r2,sy+Math.sin(aSweep)*r2);
+    ctx.stroke();
+    noGlow();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.globalAlpha = life*0.8;
+  glow(P.white, 14);
+  ctx.strokeStyle = P.white;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(sx,sy,r*.82,angle-ah,angle-ah+ah*2*sweep);
+  ctx.stroke();
+  noGlow();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────
+// 状態
+// ─────────────────────────────────────────────────────
+let t = 0;
+let slashLife = 0, slashTimer = 0;
+let orbPhase = 0, orbitAngle = 0;
+let enemyT = 0, hitFlash = 0, dmgTimer = 0;
+const hpGrid = Array.from({length:3},()=>Array.from({length:3},()=>({hp:2})));
+
+const sceneX = W/2 - 60;
+const sceneY = H/2 + 10;
+const pX = sceneX - 200, pY = sceneY;
+
+resetBullets(pY);
+
+// ─────────────────────────────────────────────────────
+// メインループ
+// ─────────────────────────────────────────────────────
+function loop() {
+  requestAnimationFrame(loop);
+  t++;
+
+  ctx.fillStyle = P.bg;
+  ctx.fillRect(0,0,W,H);
+  drawGrid();
+
+  // 壁HPセクション
+  drawWallSection(48, 68);
+
+  // 自機
+  const angle = Math.sin(t*0.018)*0.08;
+  const flash = t%28 < 3;
+
+  playerTrail.unshift({x:pX,y:pY,a:angle});
+  if(playerTrail.length>8) playerTrail.pop();
+
+  const chargeFrac = (Math.sin(t*0.025)+1)/2;
+  drawChargeRing(pX, pY, chargeFrac);
+  orbitAngle += 0.045;
+  drawOrbitTri(pX, pY, orbitAngle);
+  drawPlayer(pX, pY, angle, flash);
+
+  // 弾
+  updateBullets();
+  drawBullets(pY - bullets[0].y);
+
+  // 敵
+  const eX = sceneX + 30, eY = sceneY;
+  enemyT++;
+  hitFlash = Math.max(0, hitFlash-1);
+  dmgTimer++;
+  if(dmgTimer > 90){
+    dmgTimer = 0;
+    const cands=[];
+    for(let r=0;r<3;r++) for(let c=0;c<3;c++) if(!(r===1&&c===1)&&hpGrid[r][c].hp>0) cands.push([r,c]);
+    if(cands.length){
+      const [r,c]=cands[Math.floor(Math.random()*cands.length)];
+      hpGrid[r][c].hp=Math.max(0,hpGrid[r][c].hp-1);
+      hitFlash=6;
+    } else {
+      for(let r=0;r<3;r++) for(let c=0;c<3;c++) hpGrid[r][c].hp=2;
+    }
+  }
+  drawEnemy(eX, eY, enemyT, hitFlash, hpGrid);
+
+  // オーブ
+  orbPhase += 0.08;
+  [
+    {x:sceneX+190, y:sceneY-32, ph:orbPhase},
+    {x:sceneX+218, y:sceneY+12, ph:orbPhase+1.1},
+    {x:sceneX+178, y:sceneY+42, ph:orbPhase+2.2},
+  ].forEach(o=>drawOrb(o.x, o.y, o.ph));
+
+  // 斬撃
+  slashTimer++;
+  if(slashTimer>90){ slashTimer=0; slashLife=1; }
+  if(slashLife>0){ slashLife-=0.022; drawSlash(sceneX+300, sceneY-50, 0, slashLife); }
+
+  // ラベル
+  lbl('player + orbit + charge', pX-60, sceneY+80);
+  lbl('enemy  (red core only)',   eX-38,  sceneY+80);
+  lbl('orbs',                     sceneX+175, sceneY+80);
+  lbl('slash',                    sceneX+272, sceneY-90);
+
+  // 凡例（右下）
+  [
+    {col:P.white, tx:'Player / Bullet / Slash  →  white glow'},
+    {col:P.red,   tx:'Enemy core  →  red  (accent only)'},
+    {col:P.blueHi,tx:'Orb  →  blue  (accent only)'},
+  ].forEach((l,i)=>{
+    const lx=W-300, ly=H-70+i*22;
+    ctx.save();
+    glow(l.col, 10);
+    ctx.fillStyle=l.col;
+    ctx.fillRect(lx,ly-6,8,8);
+    noGlow();
+    ctx.restore();
+    ctx.font='9px monospace';
+    ctx.fillStyle='#333';
+    ctx.fillText(l.tx, lx+14, ly+1);
+  });
+
+  drawVignette();
+}
+
+loop();
+</script>
+</body>
+</html>
